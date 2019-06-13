@@ -1,0 +1,5 @@
+﻿  MapEditor.cpp
+C:\Users\Kimsan\Desktop\Patric\Code\MapEditor\MapEditor\olcSprConverter.h(25,1): warning C4334:  '<<': result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift intended?)
+C:\Users\Kimsan\Desktop\Patric\Code\MapEditor\MapEditor\MapEditor.cpp(46,2): warning C4091:  'typedef ': ignored on left of 'tilemap' when no variable is declared
+C:\Users\Kimsan\Desktop\Patric\Code\MapEditor\MapEditor\MapEditor.cpp(66,2): warning C4091:  'typedef ': ignored on left of 'editor_resources' when no variable is declared
+  MapEditor.vcxproj -> C:\Users\Kimsan\Desktop\Patric\Code\MapEditor\Debug\MapEditor.exe
