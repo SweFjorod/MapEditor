@@ -35,6 +35,7 @@ path Tilemap_Name;
 path Tilemap_Extension;
 
 void Set_Paths(string, string);
+void Open_Level(string);
 
 typedef struct tilemap {
 public:
@@ -240,25 +241,7 @@ public:
 
 		// Save As
 		if (GetKey(F4).bPressed) {
-			OPENFILENAME ofn;
-			::memset(&ofn, 0, sizeof(ofn));
-			char f1[MAX_PATH];
-			f1[0] = 0;
-			ofn.lStructSize = sizeof(ofn);
-			ofn.hwndOwner = NULL;
-			ofn.lpstrFile = f1;
-			ofn.lpstrFile[0] = '\0';
-			ofn.lpstrFilter = "Level Files\0*.lvl\0\0";
-			ofn.lpstrTitle = "Save As";
-			ofn.nFilterIndex = 1;
-			ofn.nMaxFile = MAX_PATH;
-			ofn.Flags = OFN_NONETWORKBUTTON |
-						OFN_FILEMUSTEXIST |
-						OFN_HIDEREADONLY;
-
-			if (::GetSaveFileName(&ofn) != FALSE) {
-				Set_Paths("Level", f1);
-			}
+			Open_Level("Save");
 
 			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
 			if (out.is_open()) {
@@ -273,27 +256,8 @@ public:
 
 		// Save Level
 		if (GetKey(F5).bPressed) {
-			if (Level_FullPath == "") {
-				OPENFILENAME ofn;
-				::memset(&ofn, 0, sizeof(ofn));
-				char f1[MAX_PATH];
-				f1[0] = 0;
-				ofn.lStructSize = sizeof(ofn);
-				ofn.hwndOwner = NULL;
-				ofn.lpstrFile = f1;
-				ofn.lpstrFile[0] = '\0';
-				ofn.lpstrFilter = "Level Files\0*.lvl\0\0";
-				ofn.lpstrTitle = "Save As";
-				ofn.nFilterIndex = 1;
-				ofn.nMaxFile = MAX_PATH;
-				ofn.Flags = OFN_NONETWORKBUTTON |
-							OFN_FILEMUSTEXIST |
-							OFN_HIDEREADONLY;
-
-				if (::GetSaveFileName(&ofn) != FALSE) {
-					Set_Paths("Level", f1);
-				}
-			}
+			if (Level_FullPath == "") 
+				Open_Level("Save");
 
 			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
 			if (out.is_open()) {
@@ -307,53 +271,34 @@ public:
 
         // Open Level
 		if (GetKey(F8).bPressed) {
-			OPENFILENAME ofn;
-			::memset(&ofn, 0, sizeof(ofn));
-			char f1[MAX_PATH];
-			f1[0] = 0;
-			ofn.lStructSize = sizeof(ofn);
-			ofn.hwndOwner = NULL;
-			ofn.lpstrFile = f1;
-			ofn.lpstrFile[0] = '\0';
-			ofn.lpstrFilter = "Level Files\0*.lvl\0\0";
-			ofn.lpstrTitle = "Select A File";
-			ofn.nFilterIndex = 1;
-			ofn.nMaxFile = MAX_PATH;
-			ofn.Flags = OFN_NONETWORKBUTTON |
-						OFN_FILEMUSTEXIST |
-						OFN_HIDEREADONLY;
+			Open_Level("Level");
+			ifstream in(Level_FullPath, ios::in | ios::binary);
+			if (in.is_open()) {
+				string filename;
+				in >> filename;
+				if (filename == "-1") {
+					filename = "";
+				}
 
-			if (::GetOpenFileName(&ofn) != FALSE) {
-				Set_Paths("Level", f1);
-				ifstream in(Level_FullPath, ios::in | ios::binary);
-				if (in.is_open()) {
-					string filename;
-					in >> filename;
-					if (filename == "-1") {
-						filename = "";
-					}
+				if (filename != "") {
+					Set_Paths("Tilemap", filename);
+					if (Tilemap_Extension == ".png") 
+						res->tMap->set_sprite(new Sprite(Tilemap_FullPath));
 
-					if (filename != "") {
-						Set_Paths("Tilemap", filename);
-						if (Tilemap_Extension == ".png") {
-							res->tMap->set_sprite(new Sprite(Tilemap_FullPath));
-						}
+					if (Tilemap_Extension == ".spr") 
+						res->tMap->set_sprite(SprConverter::convertDumbBlendedPixels(Tilemap_FullPath, 1));
+				}
 
-						if (Tilemap_Extension == ".spr") {
-							res->tMap->set_sprite(SprConverter::convertDumbBlendedPixels(Tilemap_FullPath, 1));
-						}
-					}
+				for (int i = 0; i < 713; i++) {
+					string boolval;
+					in >> mapInfo[i].x >> mapInfo[i].y >> mapInfo[i].xo >> mapInfo[i].yo >> boolval;
+					if (boolval == "1") 
+						mapInfo[i].solid = true;
+					else                
+						mapInfo[i].solid = false;
 
-					for (int i = 0; i < 713; i++) {
-						string boolval;
-
-						in >> mapInfo[i].x >> mapInfo[i].y >> mapInfo[i].xo >> mapInfo[i].yo >> boolval;
-						if (boolval == "1") mapInfo[i].solid = true;
-						else                mapInfo[i].solid = false;
-
-						if (mapInfo[i].x != -1)
-							amountDrawn++;
-					}
+					if (mapInfo[i].x != -1)
+						amountDrawn++;
 				}
 
 				in.close();
@@ -363,37 +308,50 @@ public:
 
         // Open tilemap
         if (GetKey(F9).bPressed) {
-			OPENFILENAME ofn;
-			::memset(&ofn, 0, sizeof(ofn));
-			char f1[MAX_PATH];
-			f1[0] = 0;
-			ofn.lStructSize = sizeof(ofn);
-			ofn.hwndOwner = NULL;
-			ofn.lpstrFile = f1;
-			ofn.lpstrFile[0] = '\0';
-			ofn.lpstrFilter = "Sprite Files\0*.spr\0Png Files\0*.png\0\0";
-			ofn.lpstrTitle = "Select A File";
-			ofn.nFilterIndex = 1;
-			ofn.nMaxFile = MAX_PATH;
-			ofn.Flags = OFN_NONETWORKBUTTON |
-						OFN_FILEMUSTEXIST |
-						OFN_HIDEREADONLY;
-
-			if (::GetOpenFileName(&ofn) != FALSE) {
-				Set_Paths("Tilemap", f1);
-				if (Tilemap_Extension == ".png") {
-					res->tMap->set_sprite(new Sprite(Tilemap_FullPath));
-				}
-
-				if (Tilemap_Extension == ".spr") {
-					res->tMap->set_sprite(SprConverter::convertDumbBlendedPixels(Tilemap_FullPath, 1));
-				}
+			Open_Level("Tilemap");
+			if (Tilemap_Extension == ".png") {
+				res->tMap->set_sprite(new Sprite(Tilemap_FullPath));
 			}
-        }
 
-        return true;
+			if (Tilemap_Extension == ".spr") {
+				res->tMap->set_sprite(SprConverter::convertDumbBlendedPixels(Tilemap_FullPath, 1));
+			}
+		}
+
+		return true;
     }
 };
+
+void Open_Level(string _type) {
+	OPENFILENAME ofn;
+	::memset(&ofn, 0, sizeof(ofn));
+	char f1[MAX_PATH];
+	f1[0] = 0;
+	ofn.lStructSize = sizeof(ofn);
+	ofn.hwndOwner = NULL;
+	ofn.lpstrFile = f1;
+	ofn.lpstrFile[0] = '\0';
+	if (_type == "Tilemap") 
+		ofn.lpstrFilter = "Sprite Files\0*.spr\0Png Files\0*.png\0\0";
+	else 
+		ofn.lpstrFilter = "Level Files\0*.lvl\0\0";
+	if (_type == "Save")
+		ofn.lpstrTitle = "Save As";
+	else
+		ofn.lpstrTitle = "Select A File";
+	ofn.nFilterIndex = 1;
+	ofn.nMaxFile = MAX_PATH;
+	ofn.Flags = OFN_NONETWORKBUTTON |
+				OFN_FILEMUSTEXIST |
+				OFN_HIDEREADONLY;
+
+	if (::GetOpenFileName(&ofn) != FALSE) {
+		if(_type != "Save")
+			Set_Paths(_type, f1);
+		else
+			Set_Paths("Level", f1);
+	}
+}
 
 void Set_Paths(string _type, string _fileName) {
 	if (_type == "Tilemap") {
