@@ -5,12 +5,14 @@ MapEditor for One Lone Coders RPG game by SweFjorod.
 
 Thanks to One Lone Coder for the olcPixelGameEngine
 Thanks to Gorbit99 for the olcSprConverter.h
+Thanks to Lode Vandevenne for the lodepng so I could encode png files.
 */
 
 #define OLC_PGE_APPLICATION
 
 #include "olcPixelGameEngine.h"
 #include "olcSprConverter.h"
+#include "lodepng.h"
 
 #include <fstream>
 #include <sstream>
@@ -33,9 +35,11 @@ string Tilemap_FullPath;
 path Tilemap_Path;
 path Tilemap_Name;
 path Tilemap_Extension;
+path Tilemap_NameNoExtension;
 
 void Set_Paths(string, string);
 void Open_Level(string);
+void encodeOneStep(string, vector<unsigned char>&, unsigned, unsigned);
 
 typedef struct tilemap {
 public:
@@ -223,7 +227,7 @@ public:
         }
 
 		// Draw Menu and help
-		DrawString(5, 375, "F4 = Save As  F5 = Save  F8 = Load Level  F9 = Load Tilemap", WHITE, 1);
+		DrawString(5, 375, "F2 = Save Tilemap F4 = Save As  F5 = Save  F8 = Load Level  F9 = Load Tilemap", WHITE, 1);
 		DrawString(5, 395, "[LEFT CLICK] Draw   [RIGHT CLICK] Erase   [CTRL+LEFT CLICK] Select tile", WHITE, 1);
 		DrawString(5, 405, "[MIDDLE CLICK] Set collision   [SHIFT+MIDDLE CLICK] Unset collision", WHITE, 1);
 
@@ -286,7 +290,7 @@ public:
 						res->tMap->set_sprite(new Sprite(Tilemap_FullPath));
 
 					if (Tilemap_Extension == ".spr") 
-						res->tMap->set_sprite(SprConverter::convertDumbBlendedPixels(Tilemap_FullPath, 1));
+						res->tMap->set_sprite(SprConverter::convertSmartBlendedPixels(Tilemap_FullPath, 1));
 				}
 
 				for (int i = 0; i < 713; i++) {
@@ -304,8 +308,7 @@ public:
 				in.close();
 			}
 		}
-
-
+		
         // Open tilemap
         if (GetKey(F9).bPressed) {
 			Open_Level("Tilemap");
@@ -314,13 +317,43 @@ public:
 			}
 
 			if (Tilemap_Extension == ".spr") {
-				res->tMap->set_sprite(SprConverter::convertDumbBlendedPixels(Tilemap_FullPath, 1));
+				res->tMap->set_sprite(SprConverter::convertSmartBlendedPixels(Tilemap_FullPath, 1));
+			}
+		}
+
+		if (GetKey(F2).bPressed) {
+			if (res != nullptr) {
+				vector<unsigned char> _spriteToVector;
+				int _width = res->tMap->spr->width;
+				int _height = res->tMap->spr->height;
+				for (int y = 0; y < _height; y++) {
+					for (int x = 0; x < _width; x++) {
+						_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).r);
+						_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).g);
+						_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).b);
+						_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).a);
+					}
+				}
+
+				string _string = Tilemap_NameNoExtension.string() + ".png";
+				encodeOneStep(_string, _spriteToVector, _width, _height);
 			}
 		}
 
 		return true;
     }
 };
+
+void encodeOneStep(string filename,
+	vector<unsigned char>& image, unsigned width,
+	unsigned height) {
+	//Encode the image
+	unsigned error = lodepng::encode(filename, image, width, height);
+
+	//if there's an error, display it
+	if (error)
+		cout << "encoder error " << error << ": " << lodepng_error_text(error) << endl;
+}
 
 void Open_Level(string _type) {
 	OPENFILENAME ofn;
@@ -331,25 +364,26 @@ void Open_Level(string _type) {
 	ofn.hwndOwner = NULL;
 	ofn.lpstrFile = f1;
 	ofn.lpstrFile[0] = '\0';
-	if (_type == "Tilemap") 
-		ofn.lpstrFilter = "Sprite Files\0*.spr\0Png Files\0*.png\0\0";
-	else 
-		ofn.lpstrFilter = "Level Files\0*.lvl\0\0";
-	if (_type == "Save")
-		ofn.lpstrTitle = "Save As";
-	else
-		ofn.lpstrTitle = "Select A File";
+	if (_type == "Tilemap" or _type == "SaveTileMap") { ofn.lpstrFilter = "Tile Files\0*.spr;*.png\0\0"; }
+	else { ofn.lpstrFilter = "Level Files\0*.lvl\0\0"; }
+	if (_type == "Save") { ofn.lpstrTitle = "Save As"; }
+	else { ofn.lpstrTitle = "Select A File"; }
 	ofn.nFilterIndex = 1;
 	ofn.nMaxFile = MAX_PATH;
 	ofn.Flags = OFN_NONETWORKBUTTON |
 				OFN_FILEMUSTEXIST |
 				OFN_HIDEREADONLY;
 
-	if (::GetOpenFileName(&ofn) != FALSE) {
-		if(_type != "Save")
+	if (_type != "Save" or _type != "SaveTileMap") {
+		if (::GetOpenFileName(&ofn) != FALSE) {
 			Set_Paths(_type, f1);
-		else
+		}
+	}
+
+	else {
+		if (::GetSaveFileName(&ofn) != FALSE) {
 			Set_Paths("Level", f1);
+		}
 	}
 }
 
@@ -359,6 +393,7 @@ void Set_Paths(string _type, string _fileName) {
 		Tilemap_Path = path(_fileName).remove_filename();
 		Tilemap_Name = path(_fileName).filename();
 		Tilemap_Extension = path(_fileName).extension();
+		Tilemap_NameNoExtension = path(_fileName).stem();
 	}
 
 	if (_type == "Level") {
