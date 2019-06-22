@@ -21,25 +21,23 @@ Thanks to Lode Vandevenne for the lodepng so I could encode png files.
 #include <iostream>
 #include <filesystem>
 
-using namespace std;
-using namespace experimental::filesystem;
 using namespace olc;
 
 constexpr auto TILE_SIZE = 16;
 
 //  Path variables
-string Level_FullPath;
-path Level_Path;
-path Level_Name;
-string Tilemap_FullPath;
-path Tilemap_Path;
-path Tilemap_Name;
-path Tilemap_Extension;
-path Tilemap_NameNoExtension;
+std::string Level_FullPath;
+std::experimental::filesystem::path Level_Path;
+std::experimental::filesystem::path Level_Name;
+std::string Tilemap_FullPath;
+std::experimental::filesystem::path Tilemap_Path;
+std::experimental::filesystem::path Tilemap_Name;
+std::experimental::filesystem::path Tilemap_Extension;
+std::experimental::filesystem::path Tilemap_NameNoExtension;
 
-void Set_Paths(string, string);
-void Open_Level(string);
-void encodeOneStep(string, vector<unsigned char>&, unsigned, unsigned);
+void Set_Paths(std::string, std::string);
+void Open_Level(std::string);
+void encodeOneStep(std::string, std::vector<unsigned char>&, unsigned, unsigned);
 
 typedef struct tilemap {
 public:
@@ -62,7 +60,7 @@ public:
 
 typedef struct editor_resources {
 public:
-    editor_resources(string path) {
+    editor_resources(std::string path) {
         tMap = new tilemap(new Sprite(path));
     }
 
@@ -74,7 +72,7 @@ public:
     tilemap *tMap;
 
 public:
-    void load_tilemap_file(string path) {
+    void load_tilemap_file(std::string path) {
         delete tMap;
         tMap = new tilemap(new Sprite(path));
     }
@@ -208,7 +206,7 @@ public:
             DrawRect(mouseX * TILE_SIZE, mouseY * TILE_SIZE, TILE_SIZE - 1, TILE_SIZE - 1, YELLOW);
 
             // Draw mouse coords to screen
-            DrawString(634, 395, "(" + to_string(mouseX) + "," + to_string(mouseY) + ")", WHITE, 1);
+            DrawString(634, 395, "(" + std::to_string(mouseX) + "," + std::to_string(mouseY) + ")", WHITE, 1);
 		}
         else {
             if (GetMouse(0).bPressed) {
@@ -234,8 +232,8 @@ public:
         // Draw tilemap to screen
         DrawLine(497, 0, 497, 369, DARK_GREY);
         DrawLine(0, 369, 497, 369, DARK_GREY);
-		path _path = Tilemap_Name;
-		string _path_string = _path.u8string();
+		std::experimental::filesystem::path _path = Tilemap_Name;
+		std::string _path_string = _path.u8string();
 		DrawString(504, 10, "Tilemap: " + _path_string);
 		DrawSprite(504, 20, res->tMap->spr);
 
@@ -247,11 +245,11 @@ public:
 		if (GetKey(F4).bPressed) {
 			Open_Level("Save");
 
-			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
+			std::ofstream out(Level_FullPath, std::ios::out | std::ios::trunc | std::ios::binary);
 			if (out.is_open()) {
 				out << Tilemap_FullPath;
 				for (int i = 0; i < 713; i++) {
-					out << " " << to_string(mapInfo[i].x) << " " << to_string(mapInfo[i].y) << " " << to_string(mapInfo[i].xo) << " " << to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
+					out << " " << std::to_string(mapInfo[i].x) << " " << std::to_string(mapInfo[i].y) << " " << std::to_string(mapInfo[i].xo) << " " << std::to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
 				}
 			}
 
@@ -263,11 +261,11 @@ public:
 			if (Level_FullPath == "") 
 				Open_Level("Save");
 
-			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
+			std::ofstream out(Level_FullPath, std::ios::out | std::ios::trunc | std::ios::binary);
 			if (out.is_open()) {
 				out << Tilemap_FullPath;
 				for (int i = 0; i < 713; i++) {
-					out << " " << to_string(mapInfo[i].x) << " " << to_string(mapInfo[i].y) << " " << to_string(mapInfo[i].xo) << " " << to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
+					out << " " << std::to_string(mapInfo[i].x) << " " << std::to_string(mapInfo[i].y) << " " << std::to_string(mapInfo[i].xo) << " " << std::to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
 				}
 			}
 			out.close();
@@ -276,9 +274,9 @@ public:
         // Open Level
 		if (GetKey(F8).bPressed) {
 			Open_Level("Level");
-			ifstream in(Level_FullPath, ios::in | ios::binary);
+			std::ifstream in(Level_FullPath, std::ios::in | std::ios::binary);
 			if (in.is_open()) {
-				string filename;
+				std::string filename;
 				in >> filename;
 				if (filename == "-1") {
 					filename = "";
@@ -294,7 +292,7 @@ public:
 				}
 
 				for (int i = 0; i < 713; i++) {
-					string boolval;
+					std::string boolval;
 					in >> mapInfo[i].x >> mapInfo[i].y >> mapInfo[i].xo >> mapInfo[i].yo >> boolval;
 					if (boolval == "1") 
 						mapInfo[i].solid = true;
@@ -323,7 +321,7 @@ public:
 
 		if (GetKey(F2).bPressed) {
 			if (res != nullptr) {
-				vector<unsigned char> _spriteToVector;
+				std::vector<unsigned char> _spriteToVector;
 				int _width = res->tMap->spr->width;
 				int _height = res->tMap->spr->height;
 				for (int y = 0; y < _height; y++) {
@@ -335,7 +333,7 @@ public:
 					}
 				}
 
-				string _string = Tilemap_NameNoExtension.string() + ".png";
+				std::string _string = Tilemap_NameNoExtension.string() + ".png";
 				encodeOneStep(_string, _spriteToVector, _width, _height);
 			}
 		}
@@ -344,18 +342,18 @@ public:
     }
 };
 
-void encodeOneStep(string filename,
-	vector<unsigned char>& image, unsigned width,
+void encodeOneStep(std::string filename,
+	std::vector<unsigned char>& image, unsigned width,
 	unsigned height) {
 	//Encode the image
 	unsigned error = lodepng::encode(filename, image, width, height);
 
 	//if there's an error, display it
 	if (error)
-		cout << "encoder error " << error << ": " << lodepng_error_text(error) << endl;
+		std::cout << "encoder error " << error << ": " << lodepng_error_text(error) << std::endl;
 }
 
-void Open_Level(string _type) {
+void Open_Level(std::string _type) {
 	OPENFILENAME ofn;
 	::memset(&ofn, 0, sizeof(ofn));
 	char f1[MAX_PATH];
@@ -387,19 +385,19 @@ void Open_Level(string _type) {
 	}
 }
 
-void Set_Paths(string _type, string _fileName) {
+void Set_Paths(std::string _type, std::string _fileName) {
 	if (_type == "Tilemap") {
 		Tilemap_FullPath = _fileName;
-		Tilemap_Path = path(_fileName).remove_filename();
-		Tilemap_Name = path(_fileName).filename();
-		Tilemap_Extension = path(_fileName).extension();
-		Tilemap_NameNoExtension = path(_fileName).stem();
+		Tilemap_Path = std::experimental::filesystem::path(_fileName).remove_filename();
+		Tilemap_Name = std::experimental::filesystem::path(_fileName).filename();
+		Tilemap_Extension = std::experimental::filesystem::path(_fileName).extension();
+		Tilemap_NameNoExtension = std::experimental::filesystem::path(_fileName).stem();
 	}
 
 	if (_type == "Level") {
 		Level_FullPath = _fileName;
-		Level_Path = path(_fileName).remove_filename();
-		Level_Name = path(_fileName).filename();
+		Level_Path = std::experimental::filesystem::path(_fileName).remove_filename();
+		Level_Name = std::experimental::filesystem::path(_fileName).filename();
 	}
 }
 

@@ -92,7 +92,7 @@ namespace olc {
 					Pixel c = { (uint8_t)(fg.r * percent + bg.r * (1 - percent)),
 						(uint8_t)(fg.g * percent + bg.g * (1 - percent)),
 						(uint8_t)(fg.b * percent + bg.b * (1 - percent)),
-						255 };
+						(uint8_t)(glyph != ' ' ? 255 : 0) };
 					for (unsigned int dx = 0; dx < pixelSize; dx++) {
 						for (unsigned int dy = 0; dy < pixelSize; dy++) {
 							converted->SetPixel(x * pixelSize + dx, y * pixelSize + dy, c);
@@ -153,6 +153,19 @@ namespace olc {
 			}
 		};
 
+		static std::string ReturnexePath() {
+			char result[MAX_PATH];
+			return std::string(result, GetModuleFileName(NULL, result, MAX_PATH));
+		}
+
+		static std::string GetexePath() {
+			std::string _newpath = ReturnexePath();
+			std::size_t _pos = _newpath.rfind("\\");
+			if (_pos != std::string::npos)
+				_newpath.erase(_pos + 1);
+			return _newpath;
+		}
+
 		static Pixel idToColour(char id) {
 			const Pixel colours[] = { BLACK, DARK_BLUE, DARK_GREEN, DARK_CYAN, DARK_RED, DARK_MAGENTA, DARK_YELLOW, GREY,
 				DARK_GREY, BLUE, GREEN, CYAN, RED, MAGENTA, YELLOW, WHITE };
@@ -165,7 +178,8 @@ namespace olc {
 			characters.reserve(688);
 			ids.reserve(256 * 128);
 			std::ifstream file;
-			file.open("font.pgex", std::ios::binary);
+			std::string _path = GetexePath();
+			file.open(_path + "font.pgex", std::ios::binary);
 			if (!file.is_open())
 				throw std::exception("Couldn't open font file!");
 			for (int i = 0; i < 668; i++) {
