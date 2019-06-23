@@ -120,9 +120,6 @@ public:
 	void Set_Paths(string _type, string _fileName);
 	void encodeOneStep(string filename, vector<unsigned char>& image, unsigned width, unsigned height);
 
-	int GetIndex(int x, int y);
-	bool GetSolid(int x, int y);
-
 public:
     bool OnUserCreate() override {
         sAppName = "Map Editor";
@@ -140,8 +137,8 @@ public:
 		fCameraPosX = 0.0f;
 		fCameraPosY = 0.0f;
 
-		m_solids = nullptr;
-		m_indices = nullptr;
+		m_solids = new bool[nWidth * nHeight];
+		m_indices = new int[nWidth * nHeight];
 
 		_exePath = GetexePath();
 		
@@ -318,14 +315,14 @@ public:
 			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
 			if (out.is_open()) {
 				out << Tilemap_FullPath;
-				out << nWidth << " " << nHeight;
+				out << " " << nWidth << " " << nHeight;
 				for (int x = -1; x < nVisibleTilesX + 1; x++)
 				{
 					for (int y = -1; y < nVisibleTilesY + 1; y++)
 					{
 						//out << " " << to_string(mapInfo[i].x) << " " << to_string(mapInfo[i].y) << " " << to_string(mapInfo[i].xo) << " " << to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
-						out << m_indices[GetIndex(x, y)];
-						out << m_solids[GetSolid(x, y)];
+						out << " " << m_indices[y * nWidth + x];
+						out << " " << m_solids[y * nWidth + x];
 					}
 				}
 			}
@@ -421,22 +418,6 @@ static string GetexePath() {
 	if (_pos != string::npos)
 		_newpath.erase(_pos + 1);
 	return _newpath;
-}
-
-int MapEditor::GetIndex(int x, int y)
-{
-	if (x >= 0 && x < nWidth && y >= 0 && y < nHeight)
-		return m_indices[y * nWidth + x];
-	else
-		return 0;
-}
-
-bool MapEditor::GetSolid(int x, int y)
-{
-	if (x >= 0 && x < nWidth && y >= 0 && y < nHeight)
-		return m_solids[y * nWidth + x];
-	else
-		return true;
 }
 
 void MapEditor::encodeOneStep(string filename, vector<unsigned char>& image, unsigned width, unsigned height) {
