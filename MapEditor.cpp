@@ -8,8 +8,6 @@ Thanks to Gorbit99 for the olcSprConverter.h
 Thanks to Lode Vandevenne for the lodepng so I could encode png files.
 */
 
-#define OLC_PGE_APPLICATION
-
 #include "olcPixelGameEngine.h"
 #include "olcSprConverter.h"
 #include "lodepng.h"
@@ -22,22 +20,23 @@ Thanks to Lode Vandevenne for the lodepng so I could encode png files.
 #include <filesystem>
 
 using namespace olc;
+using namespace std;
+using namespace std::experimental::filesystem;
 
 constexpr auto TILE_SIZE = 16;
 
 //  Path variables
-std::string Level_FullPath;
-std::experimental::filesystem::path Level_Path;
-std::experimental::filesystem::path Level_Name;
-std::string Tilemap_FullPath;
-std::experimental::filesystem::path Tilemap_Path;
-std::experimental::filesystem::path Tilemap_Name;
-std::experimental::filesystem::path Tilemap_Extension;
-std::experimental::filesystem::path Tilemap_NameNoExtension;
+string Level_FullPath;
+path Level_Path;
+path Level_Name;
+string Tilemap_FullPath;
+path Tilemap_Path;
+path Tilemap_Name;
+path Tilemap_Extension;
+path Tilemap_NameNoExtension;
 
-void Set_Paths(std::string, std::string);
-void Open_Level(std::string);
-void encodeOneStep(std::string, std::vector<unsigned char>&, unsigned, unsigned);
+static string GetexePath();
+string ReturnexePath();
 
 typedef struct tilemap {
 public:
@@ -60,7 +59,7 @@ public:
 
 typedef struct editor_resources {
 public:
-    editor_resources(std::string path) {
+    editor_resources(string path) {
         tMap = new tilemap(new Sprite(path));
     }
 
@@ -72,17 +71,14 @@ public:
     tilemap *tMap;
 
 public:
-    void load_tilemap_file(std::string path) {
+    void load_tilemap_file(string path) {
         delete tMap;
         tMap = new tilemap(new Sprite(path));
     }
 };
 
 struct tile_info {
-    int x;
-    int y;
-    int xo;
-    int yo;
+	int tileNumber;
     bool solid;
 };
 
@@ -90,20 +86,33 @@ struct tile_info {
 class MapEditor : public PixelGameEngine {
 private:
 	editor_resources* res;
-	
+
 	int x1;
     int x2;
     int y1;
     int y2;
 
+	int nWidth;
+	int nHeight;
+
     int offsetx;
     int offsety;
 
+	float fCameraPosX;
+	float fCameraPosY;
+
     int amountDrawn;
+
+	string _exePath;
 
     tile_info mapInfo[713];
 
     Pixel *bg_col;
+
+public:
+	void Open_Level(string _type);
+	void Set_Paths(string _type, string _fileName);
+	void encodeOneStep(string filename, vector<unsigned char>& image, unsigned width, unsigned height);
 
 public:
     bool OnUserCreate() override {
@@ -116,13 +125,17 @@ public:
         offsety = -1;
 
         amountDrawn = 0;
+
+		nWidth = 31;
+		nHeight = 23;
+		fCameraPosX = 0.0f;
+		fCameraPosY = 0.0f;
+
+		_exePath = GetexePath();
 		
         for (int i = 0; i < 713; i++) {
-            mapInfo[i].x = -1;
-            mapInfo[i].y = -1;
-            mapInfo[i].xo = -1;
-            mapInfo[i].yo = -1;
-            mapInfo[i].solid = false;
+			mapInfo[i].tileNumber = -1;
+			mapInfo[i].solid = false;
         }
 
         return true;
@@ -141,10 +154,13 @@ public:
         if (mouseX <= 30 && mouseY <= 22) {
             // offset eyedropper
             if (GetKey(CTRL).bHeld && GetMouse(0).bHeld) {
-                int index = mouseY * 31 + mouseX;                
-                if (mapInfo[index].xo != -1) {
-                    offsetx = mapInfo[index].xo;
-                    offsety = mapInfo[index].yo;
+                int index = mouseY * nWidth + mouseX;                
+                if (mapInfo[index].tileNumber != -1) {
+					int idx = mapInfo[index].tileNumber;
+					int sx = idx % 10;
+					int sy = idx / 10;
+                    offsetx = sx * TILE_SIZE;
+                    offsety = sy * TILE_SIZE;
                     x1 = offsetx + 504;
                     x2 = TILE_SIZE - 1;
                     y1 = offsety + 20;
@@ -155,11 +171,9 @@ public:
             // Place tile
             else if (GetMouse(0).bHeld) {
                 if (offsetx != -1 && offsety != -1) {
-                    int index = mouseY * 31 + mouseX;
-                    mapInfo[index].x = mouseX;
-                    mapInfo[index].y = mouseY;
-                    mapInfo[index].xo = offsetx;
-                    mapInfo[index].yo = offsety;
+                    int index = mouseY * nWidth + mouseX;
+					int tileIndex = ((offsety * res->tMap->spr->width / TILE_SIZE) + offsetx) / TILE_SIZE;
+					mapInfo[index].tileNumber = tileIndex;
                     mapInfo[index].solid = false;
 
                     amountDrawn++;
@@ -168,45 +182,52 @@ public:
 
             // Remove tile
             else if (GetMouse(1).bHeld) {
-                int index = mouseY * 31 + mouseX;
-                if (mapInfo[index].x != -1)
+                int index = mouseY * nWidth + mouseX;
+                if (mapInfo[index].tileNumber != -1)
                     amountDrawn--;
-                mapInfo[index].x = -1;
-                mapInfo[index].y = -1;
-                mapInfo[index].xo = -1;
-                mapInfo[index].yo = -1;
+				mapInfo[index].tileNumber = -1;
                 mapInfo[index].solid = false;
             }
 
             // Turn solid state off
             else if (GetKey(SHIFT).bHeld && GetMouse(2).bHeld) {
-                int index = mouseY * 31 + mouseX;
+                int index = mouseY * nWidth + mouseX;
                 mapInfo[index].solid = false;
             }
 
             // Turn solid state on
             else if (GetMouse(2).bHeld) {
-                int index = mouseY * 31 + mouseX;
+                int index = mouseY * nWidth + mouseX;
                 mapInfo[index].solid = true;
             }
         }
 
-        // Draw tiles to screen
-        if (amountDrawn > 0)
-			for (int i = 0; i < 713; i++) {
-				if (mapInfo[i].x != -1)
-					DrawPartialSprite(mapInfo[i].x * TILE_SIZE, mapInfo[i].y * TILE_SIZE, res->tMap->spr, mapInfo[i].xo, mapInfo[i].yo, TILE_SIZE, TILE_SIZE, 1);
+		// Draw visible tile map
+		if (amountDrawn > 0) {
+			// Draw tiles to screen
+			for (int y = 0; y < nHeight; y++) {
+				for (int x = 0; x < nWidth; x++) {
+					int idx = mapInfo[y * nWidth + x].tileNumber;
+					int sx = idx % 10;
+					int sy = idx / 10;
+					if (mapInfo[y * nWidth + x].tileNumber != -1)
+						DrawPartialSprite(x * TILE_SIZE, y * TILE_SIZE, res->tMap->spr, sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+					if (mapInfo[y * nWidth + x].solid)
+						DrawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE - 1, TILE_SIZE - 1, RED);
 
-				if (mapInfo[i].solid)
-					DrawRect(mapInfo[i].x * TILE_SIZE, mapInfo[i].y * TILE_SIZE, TILE_SIZE - 1, TILE_SIZE - 1, RED);
+				}
 			}
 
+		}
+
+		//DrawPartialSprite(x * TILE_SIZE - fTileOffsetX, y * TILE_SIZE - fTileOffsetY, m_pCurrentMap->pSprite, sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+			
         if (GetMouseX() / TILE_SIZE <= 30 && GetMouseY() / TILE_SIZE <= 22) {
             // Draw outline where mouse is
             DrawRect(mouseX * TILE_SIZE, mouseY * TILE_SIZE, TILE_SIZE - 1, TILE_SIZE - 1, YELLOW);
 
             // Draw mouse coords to screen
-            DrawString(634, 395, "(" + std::to_string(mouseX) + "," + std::to_string(mouseY) + ")", WHITE, 1);
+            DrawString(634, 395, "(" + to_string(mouseX) + "," + to_string(mouseY) + ")", WHITE, 1);
 		}
         else {
             if (GetMouse(0).bPressed) {
@@ -232,8 +253,8 @@ public:
         // Draw tilemap to screen
         DrawLine(497, 0, 497, 369, DARK_GREY);
         DrawLine(0, 369, 497, 369, DARK_GREY);
-		std::experimental::filesystem::path _path = Tilemap_Name;
-		std::string _path_string = _path.u8string();
+		path _path = Tilemap_Name;
+		string _path_string = _path.u8string();
 		DrawString(504, 10, "Tilemap: " + _path_string);
 		DrawSprite(504, 20, res->tMap->spr);
 
@@ -245,11 +266,17 @@ public:
 		if (GetKey(F4).bPressed) {
 			Open_Level("Save");
 
-			std::ofstream out(Level_FullPath, std::ios::out | std::ios::trunc | std::ios::binary);
+			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
 			if (out.is_open()) {
 				out << Tilemap_FullPath;
-				for (int i = 0; i < 713; i++) {
-					out << " " << std::to_string(mapInfo[i].x) << " " << std::to_string(mapInfo[i].y) << " " << std::to_string(mapInfo[i].xo) << " " << std::to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
+				out << endl;
+				out << nWidth << " " << nHeight;
+				out << endl;
+				for (int y = 0; y < nHeight; y++) {
+					for (int x = 0; x < nWidth; x++) {
+						out << " " << mapInfo[y * nWidth + x].tileNumber;
+						out << " " << mapInfo[y * nWidth + x].solid;
+					}
 				}
 			}
 
@@ -261,49 +288,60 @@ public:
 			if (Level_FullPath == "") 
 				Open_Level("Save");
 
-			std::ofstream out(Level_FullPath, std::ios::out | std::ios::trunc | std::ios::binary);
+			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
 			if (out.is_open()) {
 				out << Tilemap_FullPath;
-				for (int i = 0; i < 713; i++) {
-					out << " " << std::to_string(mapInfo[i].x) << " " << std::to_string(mapInfo[i].y) << " " << std::to_string(mapInfo[i].xo) << " " << std::to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
+				out << endl;
+				out << nWidth << " " << nHeight;
+				out << endl;
+				for (int y = 0; y < nHeight; y++) {
+					for (int x = 0; x < nWidth; x++) {
+						out << " " << mapInfo[y * nWidth + x].tileNumber;
+						out << " " << mapInfo[y * nWidth + x].solid;
+					}
 				}
 			}
+			
 			out.close();
 		}
 
         // Open Level
 		if (GetKey(F8).bPressed) {
 			Open_Level("Level");
-			std::ifstream in(Level_FullPath, std::ios::in | std::ios::binary);
-			if (in.is_open()) {
-				std::string filename;
-				in >> filename;
-				if (filename == "-1") {
-					filename = "";
+			ifstream data(Level_FullPath, ios::in | ios::binary);
+			if (data.is_open()) {
+				data >> Tilemap_FullPath;
+				data >> nWidth >> nHeight;
+				if (Tilemap_FullPath == "-1") {
+					Tilemap_FullPath = "";
 				}
 
-				if (filename != "") {
-					Set_Paths("Tilemap", filename);
+				if (Tilemap_FullPath != "") {
+					Set_Paths("Tilemap", Tilemap_FullPath);
 					if (Tilemap_Extension == ".png") 
 						res->tMap->set_sprite(new Sprite(Tilemap_FullPath));
-
 					if (Tilemap_Extension == ".spr") 
 						res->tMap->set_sprite(SprConverter::convertSmartBlendedPixels(Tilemap_FullPath, 1));
 				}
+				for (int y = 0; y < nHeight; y++) {
+					for (int x = 0; x < nWidth; x++) {
+						string boolval;
+						data >> mapInfo[y * nWidth + x].tileNumber >> boolval;
+						if (boolval == "1") {
+							mapInfo[y * nWidth + x].solid = true;
+						}
 
-				for (int i = 0; i < 713; i++) {
-					std::string boolval;
-					in >> mapInfo[i].x >> mapInfo[i].y >> mapInfo[i].xo >> mapInfo[i].yo >> boolval;
-					if (boolval == "1") 
-						mapInfo[i].solid = true;
-					else                
-						mapInfo[i].solid = false;
+						else {
+							mapInfo[y * nWidth + x].solid = false;
+						}
 
-					if (mapInfo[i].x != -1)
-						amountDrawn++;
+						if (mapInfo[y * nWidth + x].tileNumber != -1) {
+							amountDrawn++;
+						}
+					}
 				}
 
-				in.close();
+				data.close();
 			}
 		}
 		
@@ -321,7 +359,7 @@ public:
 
 		if (GetKey(F2).bPressed) {
 			if (res != nullptr) {
-				std::vector<unsigned char> _spriteToVector;
+				vector<unsigned char> _spriteToVector;
 				int _width = res->tMap->spr->width;
 				int _height = res->tMap->spr->height;
 				for (int y = 0; y < _height; y++) {
@@ -333,7 +371,7 @@ public:
 					}
 				}
 
-				std::string _string = Tilemap_NameNoExtension.string() + ".png";
+				string _string = Tilemap_NameNoExtension.string() + ".png";
 				encodeOneStep(_string, _spriteToVector, _width, _height);
 			}
 		}
@@ -342,18 +380,29 @@ public:
     }
 };
 
-void encodeOneStep(std::string filename,
-	std::vector<unsigned char>& image, unsigned width,
-	unsigned height) {
+static string ReturnexePath() {
+	char result[MAX_PATH];
+	return string(result, GetModuleFileName(NULL, result, MAX_PATH));
+}
+
+static string GetexePath() {
+	string _newpath = ReturnexePath();
+	size_t _pos = _newpath.rfind("\\");
+	if (_pos != string::npos)
+		_newpath.erase(_pos + 1);
+	return _newpath;
+}
+
+void MapEditor::encodeOneStep(string filename, vector<unsigned char>& image, unsigned width, unsigned height) {
 	//Encode the image
 	unsigned error = lodepng::encode(filename, image, width, height);
 
 	//if there's an error, display it
 	if (error)
-		std::cout << "encoder error " << error << ": " << lodepng_error_text(error) << std::endl;
+		cout << "encoder error " << error << ": " << lodepng_error_text(error) << endl;
 }
 
-void Open_Level(std::string _type) {
+void MapEditor::Open_Level(string _type) {
 	OPENFILENAME ofn;
 	::memset(&ofn, 0, sizeof(ofn));
 	char f1[MAX_PATH];
@@ -362,7 +411,7 @@ void Open_Level(std::string _type) {
 	ofn.hwndOwner = NULL;
 	ofn.lpstrFile = f1;
 	ofn.lpstrFile[0] = '\0';
-	if (_type == "Tilemap" or _type == "SaveTileMap") { ofn.lpstrFilter = "Tile Files\0*.spr;*.png\0\0"; }
+	if (_type == "Tilemap" || _type == "SaveTileMap") { ofn.lpstrFilter = "Tile Files\0*.spr;*.png\0\0"; }
 	else { ofn.lpstrFilter = "Level Files\0*.lvl\0\0"; }
 	if (_type == "Save") { ofn.lpstrTitle = "Save As"; }
 	else { ofn.lpstrTitle = "Select A File"; }
@@ -372,32 +421,32 @@ void Open_Level(std::string _type) {
 				OFN_FILEMUSTEXIST |
 				OFN_HIDEREADONLY;
 
-	if (_type != "Save" or _type != "SaveTileMap") {
-		if (::GetOpenFileName(&ofn) != FALSE) {
-			Set_Paths(_type, f1);
-		}
-	}
-
-	else {
+	if (_type == "Save" || _type == "SaveTileMap") {
 		if (::GetSaveFileName(&ofn) != FALSE) {
 			Set_Paths("Level", f1);
 		}
 	}
+
+	else {
+		if (::GetOpenFileName(&ofn) != FALSE) {
+			Set_Paths(_type, f1);
+		}
+	}
 }
 
-void Set_Paths(std::string _type, std::string _fileName) {
+void MapEditor::Set_Paths(string _type, string _fileName) {
 	if (_type == "Tilemap") {
 		Tilemap_FullPath = _fileName;
-		Tilemap_Path = std::experimental::filesystem::path(_fileName).remove_filename();
-		Tilemap_Name = std::experimental::filesystem::path(_fileName).filename();
-		Tilemap_Extension = std::experimental::filesystem::path(_fileName).extension();
-		Tilemap_NameNoExtension = std::experimental::filesystem::path(_fileName).stem();
+		Tilemap_Path = path(_fileName).remove_filename();
+		Tilemap_Name = path(_fileName).filename();
+		Tilemap_Extension = path(_fileName).extension();
+		Tilemap_NameNoExtension = path(_fileName).stem();
 	}
 
 	if (_type == "Level") {
 		Level_FullPath = _fileName;
-		Level_Path = std::experimental::filesystem::path(_fileName).remove_filename();
-		Level_Name = std::experimental::filesystem::path(_fileName).filename();
+		Level_Path = path(_fileName).remove_filename();
+		Level_Name = path(_fileName).filename();
 	}
 }
 
