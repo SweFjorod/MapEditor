@@ -143,6 +143,8 @@ public:
 		_exePath = GetexePath();
 		
         for (int i = 0; i < 713; i++) {
+			m_indices[i] = -1;
+			m_solids[i] = false;
 			mapInfo[i].x = -1;
             mapInfo[i].y = -1;
             mapInfo[i].xo = -1;
@@ -316,9 +318,9 @@ public:
 			if (out.is_open()) {
 				out << Tilemap_FullPath;
 				out << " " << nWidth << " " << nHeight;
-				for (int x = -1; x < nVisibleTilesX + 1; x++)
+				for (int x = -1; x < nWidth + 1; x++)
 				{
-					for (int y = -1; y < nVisibleTilesY + 1; y++)
+					for (int y = -1; y < nHeight + 1; y++)
 					{
 						//out << " " << to_string(mapInfo[i].x) << " " << to_string(mapInfo[i].y) << " " << to_string(mapInfo[i].xo) << " " << to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
 						out << " " << m_indices[y * nWidth + x];
