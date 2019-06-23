@@ -98,9 +98,6 @@ private:
     int offsetx;
     int offsety;
 
-	float fCameraPosX;
-	float fCameraPosY;
-
     int amountDrawn;
 
 	string _exePath;
@@ -128,8 +125,6 @@ public:
 
 		nWidth = 31;
 		nHeight = 23;
-		fCameraPosX = 0.0f;
-		fCameraPosY = 0.0f;
 
 		_exePath = GetexePath();
 		
@@ -274,8 +269,8 @@ public:
 				out << endl;
 				for (int y = 0; y < nHeight; y++) {
 					for (int x = 0; x < nWidth; x++) {
-						out << " " << mapInfo[y * nWidth + x].tileNumber;
-						out << " " << mapInfo[y * nWidth + x].solid;
+						out << mapInfo[y * nWidth + x].tileNumber << " ";
+						out << mapInfo[y * nWidth + x].solid << " ";
 					}
 				}
 			}
@@ -296,8 +291,8 @@ public:
 				out << endl;
 				for (int y = 0; y < nHeight; y++) {
 					for (int x = 0; x < nWidth; x++) {
-						out << " " << mapInfo[y * nWidth + x].tileNumber;
-						out << " " << mapInfo[y * nWidth + x].solid;
+						out << mapInfo[y * nWidth + x].tileNumber << " ";
+						out << mapInfo[y * nWidth + x].solid << " ";
 					}
 				}
 			}
@@ -327,14 +322,9 @@ public:
 					for (int x = 0; x < nWidth; x++) {
 						string boolval;
 						data >> mapInfo[y * nWidth + x].tileNumber >> boolval;
-						if (boolval == "1") {
-							mapInfo[y * nWidth + x].solid = true;
-						}
-
-						else {
+						boolval == "1" ? 
+							mapInfo[y * nWidth + x].solid = true : 
 							mapInfo[y * nWidth + x].solid = false;
-						}
-
 						if (mapInfo[y * nWidth + x].tileNumber != -1) {
 							amountDrawn++;
 						}
