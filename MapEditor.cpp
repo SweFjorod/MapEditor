@@ -78,10 +78,7 @@ public:
 };
 
 struct tile_info {
-	int x;
-    int y;
-    int xo;
-    int yo;
+	int tileNumber;
     bool solid;
 };
 
@@ -112,9 +109,6 @@ private:
 
     Pixel *bg_col;
 
-	int* m_indices = nullptr;
-	bool* m_solids = nullptr;
-
 public:
 	void Open_Level(string _type);
 	void Set_Paths(string _type, string _fileName);
@@ -137,19 +131,11 @@ public:
 		fCameraPosX = 0.0f;
 		fCameraPosY = 0.0f;
 
-		m_solids = new bool[nWidth * nHeight];
-		m_indices = new int[nWidth * nHeight];
-
 		_exePath = GetexePath();
 		
         for (int i = 0; i < 713; i++) {
-			m_indices[i] = -1;
-			m_solids[i] = false;
-			mapInfo[i].x = -1;
-            mapInfo[i].y = -1;
-            mapInfo[i].xo = -1;
-            mapInfo[i].yo = -1;
-            mapInfo[i].solid = false;
+			mapInfo[i].tileNumber = -1;
+			mapInfo[i].solid = false;
         }
 
         return true;
@@ -169,9 +155,12 @@ public:
             // offset eyedropper
             if (GetKey(CTRL).bHeld && GetMouse(0).bHeld) {
                 int index = mouseY * nWidth + mouseX;                
-                if (mapInfo[index].xo != -1) {
-                    offsetx = mapInfo[index].xo;
-                    offsety = mapInfo[index].yo;
+                if (mapInfo[index].tileNumber != -1) {
+					int idx = mapInfo[index].tileNumber;
+					int sx = idx % 10;
+					int sy = idx / 10;
+                    offsetx = sx * TILE_SIZE;
+                    offsety = sy * TILE_SIZE;
                     x1 = offsetx + 504;
                     x2 = TILE_SIZE - 1;
                     y1 = offsety + 20;
@@ -183,13 +172,8 @@ public:
             else if (GetMouse(0).bHeld) {
                 if (offsetx != -1 && offsety != -1) {
                     int index = mouseY * nWidth + mouseX;
-					int tileIndex = offsety * nWidth + offsetx;
-					m_indices[index] = tileIndex;
-					m_solids[index] = false;
-                    mapInfo[index].x = mouseX;
-                    mapInfo[index].y = mouseY;
-                    mapInfo[index].xo = offsetx;
-                    mapInfo[index].yo = offsety;
+					int tileIndex = ((offsety * res->tMap->spr->width / TILE_SIZE) + offsetx) / TILE_SIZE;
+					mapInfo[index].tileNumber = tileIndex;
                     mapInfo[index].solid = false;
 
                     amountDrawn++;
@@ -199,12 +183,9 @@ public:
             // Remove tile
             else if (GetMouse(1).bHeld) {
                 int index = mouseY * nWidth + mouseX;
-                if (mapInfo[index].x != -1)
+                if (mapInfo[index].tileNumber != -1)
                     amountDrawn--;
-                mapInfo[index].x = -1;
-                mapInfo[index].y = -1;
-                mapInfo[index].xo = -1;
-                mapInfo[index].yo = -1;
+				mapInfo[index].tileNumber = -1;
                 mapInfo[index].solid = false;
             }
 
@@ -217,39 +198,26 @@ public:
             // Turn solid state on
             else if (GetMouse(2).bHeld) {
                 int index = mouseY * nWidth + mouseX;
-				m_solids[index] = true;
                 mapInfo[index].solid = true;
             }
         }
 
-		// Draw Level
-		int nVisibleTilesX = nWidth;
-		int nVisibleTilesY = nHeight;
-
-		// Calculate Top-Leftmost visible tile
-		float fOffsetX = fCameraPosX - (float)nVisibleTilesX / 2.0f;
-		float fOffsetY = fCameraPosY - (float)nVisibleTilesY / 2.0f;
-
-		// Clamp camera to game boundaries
-		if (fOffsetX < 0) fOffsetX = 0;
-		if (fOffsetY < 0) fOffsetY = 0;
-		if (fOffsetX > nWidth - nVisibleTilesX) fOffsetX = nWidth - nVisibleTilesX;
-		if (fOffsetY > nHeight - nVisibleTilesY) fOffsetY = nHeight - nVisibleTilesY;
-
-		// Get offsets for smooth movement
-		float fTileOffsetX = (fOffsetX - (int)fOffsetX) * TILE_SIZE;
-		float fTileOffsetY = (fOffsetY - (int)fOffsetY) * TILE_SIZE;
-
 		// Draw visible tile map
 		if (amountDrawn > 0) {
 			// Draw tiles to screen
-			for (int i = 0; i < nVisibleTilesX * nVisibleTilesY; i++) {
-				if (mapInfo[i].x != -1)
-					DrawPartialSprite(mapInfo[i].x * TILE_SIZE, mapInfo[i].y * TILE_SIZE, res->tMap->spr, mapInfo[i].xo, mapInfo[i].yo, TILE_SIZE, TILE_SIZE, 1);
+			for (int y = 0; y < nHeight; y++) {
+				for (int x = 0; x < nWidth; x++) {
+					int idx = mapInfo[y * nWidth + x].tileNumber;
+					int sx = idx % 10;
+					int sy = idx / 10;
+					if (mapInfo[y * nWidth + x].tileNumber != -1)
+						DrawPartialSprite(x * TILE_SIZE, y * TILE_SIZE, res->tMap->spr, sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+					if (mapInfo[y * nWidth + x].solid)
+						DrawRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE - 1, TILE_SIZE - 1, RED);
 
-				if (mapInfo[i].solid)
-					DrawRect(mapInfo[i].x * TILE_SIZE, mapInfo[i].y * TILE_SIZE, TILE_SIZE - 1, TILE_SIZE - 1, RED);
+				}
 			}
+
 		}
 
 		//DrawPartialSprite(x * TILE_SIZE - fTileOffsetX, y * TILE_SIZE - fTileOffsetY, m_pCurrentMap->pSprite, sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -301,8 +269,14 @@ public:
 			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
 			if (out.is_open()) {
 				out << Tilemap_FullPath;
-				for (int i = 0; i < 713; i++) {
-					out << " " << to_string(mapInfo[i].x) << " " << to_string(mapInfo[i].y) << " " << to_string(mapInfo[i].xo) << " " << to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
+				out << endl;
+				out << nWidth << " " << nHeight;
+				out << endl;
+				for (int y = 0; y < nHeight; y++) {
+					for (int x = 0; x < nWidth; x++) {
+						out << " " << mapInfo[y * nWidth + x].tileNumber;
+						out << " " << mapInfo[y * nWidth + x].solid;
+					}
 				}
 			}
 
@@ -317,17 +291,17 @@ public:
 			ofstream out(Level_FullPath, ios::out | ios::trunc | ios::binary);
 			if (out.is_open()) {
 				out << Tilemap_FullPath;
-				out << " " << nWidth << " " << nHeight;
-				for (int x = -1; x < nWidth + 1; x++)
-				{
-					for (int y = -1; y < nHeight + 1; y++)
-					{
-						//out << " " << to_string(mapInfo[i].x) << " " << to_string(mapInfo[i].y) << " " << to_string(mapInfo[i].xo) << " " << to_string(mapInfo[i].yo) << " " << (mapInfo[i].solid ? "1" : "0");
-						out << " " << m_indices[y * nWidth + x];
-						out << " " << m_solids[y * nWidth + x];
+				out << endl;
+				out << nWidth << " " << nHeight;
+				out << endl;
+				for (int y = 0; y < nHeight; y++) {
+					for (int x = 0; x < nWidth; x++) {
+						out << " " << mapInfo[y * nWidth + x].tileNumber;
+						out << " " << mapInfo[y * nWidth + x].solid;
 					}
 				}
 			}
+			
 			out.close();
 		}
 
@@ -336,38 +310,35 @@ public:
 			Open_Level("Level");
 			ifstream data(Level_FullPath, ios::in | ios::binary);
 			if (data.is_open()) {
-				string filename;
-				data >> filename;
-				if (filename == "-1") {
-					filename = "";
+				data >> Tilemap_FullPath;
+				data >> nWidth >> nHeight;
+				if (Tilemap_FullPath == "-1") {
+					Tilemap_FullPath = "";
 				}
 
-				if (filename != "") {
-					Set_Paths("Tilemap", filename);
+				if (Tilemap_FullPath != "") {
+					Set_Paths("Tilemap", Tilemap_FullPath);
 					if (Tilemap_Extension == ".png") 
 						res->tMap->set_sprite(new Sprite(Tilemap_FullPath));
-
 					if (Tilemap_Extension == ".spr") 
 						res->tMap->set_sprite(SprConverter::convertSmartBlendedPixels(Tilemap_FullPath, 1));
 				}
+				for (int y = 0; y < nHeight; y++) {
+					for (int x = 0; x < nWidth; x++) {
+						string boolval;
+						data >> mapInfo[y * nWidth + x].tileNumber >> boolval;
+						if (boolval == "1") {
+							mapInfo[y * nWidth + x].solid = true;
+						}
 
-				// data >> nWidth >> nHeight;
-				//m_indices = new int[nWidth * nHeight];
-				//for (int i = 0; i < nWidth * nHeight; i++) {
-					//data >> m_indices[i];
-					//data >> m_solids[i];
-				//}
+						else {
+							mapInfo[y * nWidth + x].solid = false;
+						}
 
-				for (int i = 0; i < 713; i++) {
-					string boolval;
-					data >> mapInfo[i].x >> mapInfo[i].y >> mapInfo[i].xo >> mapInfo[i].yo >> boolval;
-					if (boolval == "1") 
-						mapInfo[i].solid = true;
-					else                
-						mapInfo[i].solid = false;
-
-					if (mapInfo[i].x != -1)
-						amountDrawn++;
+						if (mapInfo[y * nWidth + x].tileNumber != -1) {
+							amountDrawn++;
+						}
+					}
 				}
 
 				data.close();
