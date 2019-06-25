@@ -90,6 +90,8 @@ private:
 	float old_time = 0.0f;
 	float new_time = 0.0f;
 	bool cursor = false;
+	int canvas_width = 31;
+	int canvas_height = 23;
 
 	int x1 = 0;
     int x2 = 0;
@@ -128,8 +130,8 @@ public:
 
         amount_drawn = 0;
 
-		n_width = 31;
-		n_height = 23;
+		n_width = canvas_width;
+		n_height = canvas_height;
 
         for (auto& i : map_info) {
 	        i.tileNumber = -1;
@@ -145,11 +147,14 @@ public:
         auto mouseY = GetMouseY() / tile_size;
         auto actualMouseX = GetMouseX();
         auto actualMouseY = GetMouseY();
+		auto _nWidthOffset = to_string(n_width).length() * 8;
+		auto _widthSumOffset = to_string(width_sum).length() * 8;
+		auto _heightSumOffset = to_string(height_sum).length() * 8;
 
         Clear(*bg_col);
 
-        // Mouse button handling on main area
-        if (mouseX <= n_width -1 && mouseY <= n_height -1) {
+        // Mouse button handling in canvas area
+        if (mouseX <= canvas_width -1 && mouseY <= canvas_height -1) {
             // offset eyedropper
             if (GetKey(CTRL).bHeld && GetMouse(0).bHeld) {
 	            auto index = mouseY * n_width + mouseX;                
@@ -218,9 +223,7 @@ public:
 
 		}
 
-		//DrawPartialSprite(x * TILE_SIZE - fTileOffsetX, y * TILE_SIZE - fTileOffsetY, m_pCurrentMap->pSprite, sx * TILE_SIZE, sy * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-			
-        if (GetMouseX() / tile_size <= n_width -1 && GetMouseY() / tile_size <= n_height -1) {
+        if (GetMouseX() / tile_size <= canvas_width -1 && GetMouseY() / tile_size <= canvas_height -1) {
             // Draw outline where mouse is
             DrawRect(mouseX * tile_size, mouseY * tile_size, tile_size - 1, tile_size - 1, YELLOW);
 
@@ -241,7 +244,7 @@ public:
                     offsety = static_cast<int>(actualMouseY - 40) / tile_size * tile_size;
                 }
 
-				if (GetMouseX() >= 632 && GetMouseX() < 632 + res_button->tMap->spr->width &&
+				if (GetMouseX() >= 616 + _nWidthOffset && GetMouseX() < 616 + _nWidthOffset + res_button->tMap->spr->width &&
 					GetMouseY() >= 8 && GetMouseY() < 8 + res_button->tMap->spr->height) {
 					width_sum = 0;
 					height_sum = 0;
@@ -256,15 +259,25 @@ public:
 			DrawString(5, 375, "F2 = Save Tilemap F4 = Save As  F5 = Save  F8 = Load Level  F9 = Load Tilemap", WHITE, 1);
 			DrawString(5, 395, "[LEFT CLICK] Draw   [RIGHT CLICK] Erase   [CTRL+LEFT CLICK] Select tile", WHITE, 1);
 			DrawString(5, 405, "[MIDDLE CLICK] Set collision   [SHIFT+MIDDLE CLICK] Unset collision", WHITE, 1);
+
+			SetPixelMode(Pixel::MASK);
+			DrawSprite(616 + _nWidthOffset, 8, res_button->tMap->spr);
+			SetPixelMode(Pixel::NORMAL);
+
 		}
 		// Draw simulated input field
 		else {
-			text_mode == 1 ? DrawString(5, 375, "New Level Width: ") : DrawString(5, 375, "New Level Height: ");;
+			if (text_mode == 1) 
+				DrawString(5, 375, "New Level Width: ");
+			else 
+				DrawString(5, 375, "New Level Height: ");;
+
 			for (auto i = 0; i < 10; i++) {
 				if (GetKey(static_cast<Key>(int(K0) + i)).bPressed) input_number += '0' + i;
 			}
 
 			if (text_mode != 0) {
+				// Draw simulated cursor
 				new_time = new_time + fElapsedTime;
 				if (new_time > old_time) {
 					cursor = !cursor;
@@ -272,24 +285,30 @@ public:
 				}
 
 				if (cursor)
-					text_mode == 1 ?
-						width_sum > 0 ? DrawString(135 + to_string(width_sum).length() * 8, 375, "_") : DrawString(135, 375, "_") :
-						height_sum > 0 ? DrawString(145 + to_string(height_sum).length() * 8, 375, "_") : DrawString(145, 375, "_");
+					if (text_mode == 1) 
+						DrawString(width_sum > 0 ? 135 + _widthSumOffset : 135, 375, "_");
+					else 
+						DrawString(height_sum > 0 ? 145 + _heightSumOffset : 145, 375, "_");
 
+				// Draw numbers to simulated input field
 				if(width_sum > 0 && text_mode == 1)
 					DrawString(135, 375, to_string(width_sum));
 				if(height_sum > 0 && text_mode == 2)
 					DrawString(145, 375, to_string(height_sum));
+
 				if (input_number != 0) {
-					text_mode == 1 ? width_sum = width_sum * 10 + (input_number - 48) : height_sum = height_sum * 10 + (input_number - 48);
+					if (text_mode == 1) 
+						width_sum = width_sum * 10 + input_number - 48;
+					else 
+						height_sum = height_sum * 10 + input_number - 48;
 					input_number = 0;
 				}
 
 				if (GetKey(BACK).bPressed)
-					text_mode == 1 ? width_sum = width_sum / 10 : height_sum = height_sum / 10;
+					text_mode == 1 ? width_sum /= 10 : height_sum /= 10;
 
-				if (GetKey(ENTER).bReleased) {
-					text_mode = text_mode + 1;
+				if (GetKey(ENTER).bPressed) {
+					text_mode++;
 				}
 
 				if (text_mode >= 3) {
@@ -311,9 +330,6 @@ public:
 		DrawString(504, 20, "Level Height: " + to_string(n_height));
 		DrawString(504, 30, "Tilemap: " + _path_string);
 		DrawSprite(504, 40, res->tMap->spr);
-		SetPixelMode(Pixel::MASK);
-		DrawSprite(632, 8, res_button->tMap->spr);
-		SetPixelMode(Pixel::NORMAL);
 
         // Draw outline on selected tilemap tile
         if (x1 != NULL)
