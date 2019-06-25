@@ -217,9 +217,9 @@
 #include <cmath>
 #include <cstdint>
 #include <string>
-#include <iostream>
 #include <streambuf>
 #include <chrono>
+#include <utility>
 #include <vector>
 #include <list>
 #include <thread>
@@ -332,15 +332,15 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		};
 
 	public:
-		olc::rcode AddToPack(std::string sFile);
+		olc::rcode AddToPack(const std::string& sFile);
 
 	public:
-		olc::rcode SavePack(std::string sFile);
-		olc::rcode LoadPack(std::string sFile);
+		olc::rcode SavePack(const std::string& sFile);
+		olc::rcode LoadPack(const std::string& sFile);
 		olc::rcode ClearPack();
 
 	public:
-		olc::ResourcePack::sEntry GetStreamBuffer(std::string sFile);
+		olc::ResourcePack::sEntry GetStreamBuffer(const std::string& sFile);
 
 	private:
 
@@ -355,14 +355,14 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 	public:
 		Sprite();
 		Sprite(std::string sImageFile);
-		Sprite(std::string sImageFile, olc::ResourcePack *pack);
+		Sprite(const std::string& sImageFile, olc::ResourcePack *pack);
 		Sprite(int32_t w, int32_t h);
 		~Sprite();
 
 	public:
-		olc::rcode LoadFromFile(std::string sImageFile, olc::ResourcePack *pack = nullptr);
-		olc::rcode LoadFromPGESprFile(std::string sImageFile, olc::ResourcePack *pack = nullptr);
-		olc::rcode SaveToPGESprFile(std::string sImageFile);
+		olc::rcode LoadFromFile(const std::string& sImageFile, olc::ResourcePack *pack = nullptr);
+		olc::rcode LoadFromPGESprFile(const std::string& sImageFile, olc::ResourcePack *pack = nullptr);
+		olc::rcode SaveToPGESprFile(const std::string& sImageFile);
 
 	public:
 		int32_t width = 0;
@@ -410,6 +410,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 	class PixelGameEngine
 	{
 	public:
+		virtual ~PixelGameEngine() = default;
 		PixelGameEngine();
 
 	public:
@@ -489,7 +490,7 @@ namespace olc // All OneLoneCoder stuff will now exist in the "olc" namespace
 		// selected area is (ox,oy) to (ox+w,oy+h)
 		void DrawPartialSprite(int32_t x, int32_t y, Sprite *sprite, int32_t ox, int32_t oy, int32_t w, int32_t h, uint32_t scale = 1);
 		// Draws a single line of text
-		void DrawString(int32_t x, int32_t y, std::string sText, Pixel col = olc::WHITE, uint32_t scale = 1);
+		void DrawString(int32_t x, int32_t y, const std::string& sText, Pixel col = olc::WHITE, uint32_t scale = 1);
 		// Clears entire draw target to Pixel
 		void Clear(Pixel p);
 
@@ -637,7 +638,7 @@ namespace olc
 
 	//==========================================================
 
-	std::wstring ConvertS2W(std::string s)
+	std::wstring ConvertS2W(const std::string& s)
 	{
 #ifdef _WIN32
 		int count = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, NULL, 0);
@@ -660,10 +661,10 @@ namespace olc
 
 	Sprite::Sprite(std::string sImageFile)
 	{
-		LoadFromFile(sImageFile);
+		LoadFromFile(std::move(sImageFile));
 	}
 
-	Sprite::Sprite(std::string sImageFile, olc::ResourcePack *pack)
+	Sprite::Sprite(const std::string& sImageFile, olc::ResourcePack *pack)
 	{
 		LoadFromPGESprFile(sImageFile, pack);
 	}
@@ -682,7 +683,7 @@ namespace olc
 		if (pColData) delete pColData;
 	}
 
-	olc::rcode Sprite::LoadFromPGESprFile(std::string sImageFile, olc::ResourcePack *pack)
+	olc::rcode Sprite::LoadFromPGESprFile(const std::string& sImageFile, olc::ResourcePack *pack)
 	{
 		if (pColData) delete[] pColData;
 
@@ -719,7 +720,7 @@ namespace olc
 		return olc::FAIL;
 		}
 
-	olc::rcode Sprite::SaveToPGESprFile(std::string sImageFile)
+	olc::rcode Sprite::SaveToPGESprFile(const std::string& sImageFile)
 	{
 		if (pColData == nullptr) return olc::FAIL;
 
@@ -737,7 +738,7 @@ namespace olc
 		return olc::FAIL;
 	}
 
-	olc::rcode Sprite::LoadFromFile(std::string sImageFile, olc::ResourcePack *pack)
+	olc::rcode Sprite::LoadFromFile(const std::string& sImageFile, olc::ResourcePack *pack)
 	{
 #ifdef _WIN32
 		// Use GDI+
@@ -887,8 +888,8 @@ namespace olc
 
 	Pixel Sprite::Sample(float x, float y)
 	{
-		int32_t sx = std::min((int32_t)((x * (float)width)), width - 1);
-		int32_t sy = std::min((int32_t)((y * (float)height)), height - 1);
+		int32_t sx = std::min((int32_t)(x * (float)width), width - 1);
+		int32_t sy = std::min((int32_t)(y * (float)height), height - 1);
 		return GetPixel(sx, sy);
 	}
 
@@ -928,7 +929,7 @@ namespace olc
 		ClearPack();
 	}
 
-	olc::rcode ResourcePack::AddToPack(std::string sFile)
+	olc::rcode ResourcePack::AddToPack(const std::string& sFile)
 	{
 		std::ifstream ifs(sFile, std::ifstream::binary);
 		if (!ifs.is_open()) return olc::FAIL;
@@ -955,7 +956,7 @@ namespace olc
 		return olc::OK;
 	}
 
-	olc::rcode ResourcePack::SavePack(std::string sFile)
+	olc::rcode ResourcePack::SavePack(const std::string& sFile)
 	{
 		std::ofstream ofs(sFile, std::ofstream::binary);
 		if (!ofs.is_open()) return olc::FAIL;
@@ -999,7 +1000,7 @@ namespace olc
 		return olc::OK;
 	}
 
-	olc::rcode ResourcePack::LoadPack(std::string sFile)
+	olc::rcode ResourcePack::LoadPack(const std::string& sFile)
 	{
 		std::ifstream ifs(sFile, std::ifstream::binary);
 		if (!ifs.is_open()) return olc::FAIL;
@@ -1037,7 +1038,7 @@ namespace olc
 		return olc::OK;
 	}
 
-	olc::ResourcePack::sEntry ResourcePack::GetStreamBuffer(std::string sFile)
+	olc::ResourcePack::sEntry ResourcePack::GetStreamBuffer(const std::string& sFile)
 	{
 		return mapFiles[sFile];
 	}
@@ -1070,8 +1071,8 @@ namespace olc
 		nPixelHeight = pixel_h;
 		bFullScreen = full_screen;
 
-		fPixelX = 2.0f / (float)(nScreenWidth);
-		fPixelY = 2.0f / (float)(nScreenHeight);
+		fPixelX = 2.0f / (float)nScreenWidth;
+		fPixelY = 2.0f / (float)nScreenHeight;
 
 		if (nPixelWidth == 0 || nPixelHeight == 0 || nScreenWidth == 0 || nScreenHeight == 0)
 			return olc::FAIL;
@@ -1244,7 +1245,7 @@ namespace olc
 
 		auto rol = [&](void)
 		{
-			pattern = (pattern << 1) | (pattern >> 31);
+			pattern = pattern << 1 | pattern >> 31;
 			return pattern & 1;
 		};
 
@@ -1288,7 +1289,7 @@ namespace olc
 					px = px + 2 * dy1;
 				else
 				{
-					if ((dx<0 && dy<0) || (dx>0 && dy>0)) y = y + 1; else y = y - 1;
+					if (dx<0 && dy<0 || dx>0 && dy>0) y = y + 1; else y = y - 1;
 					px = px + 2 * (dy1 - dx1);
 				}
 				if (rol()) Draw(x, y, p);
@@ -1314,7 +1315,7 @@ namespace olc
 					py = py + 2 * dx1;
 				else
 				{
-					if ((dx<0 && dy<0) || (dx>0 && dy>0)) x = x + 1; else x = x - 1;
+					if (dx<0 && dy<0 || dx>0 && dy>0) x = x + 1; else x = x - 1;
 					py = py + 2 * (dx1 - dy1);
 				}
 				if (rol()) Draw(x, y, p);
@@ -1565,7 +1566,7 @@ namespace olc
 				for (int32_t j = 0; j < sprite->height; j++)
 					for (uint32_t is = 0; is < scale; is++)
 						for (uint32_t js = 0; js < scale; js++)
-							Draw(x + (i*scale) + is, y + (j*scale) + js, sprite->GetPixel(i, j));
+							Draw(x + i*scale + is, y + j*scale + js, sprite->GetPixel(i, j));
 		}
 		else
 		{
@@ -1586,7 +1587,7 @@ namespace olc
 				for (int32_t j = 0; j < h; j++)
 					for (uint32_t is = 0; is < scale; is++)
 						for (uint32_t js = 0; js < scale; js++)
-							Draw(x + (i*scale) + is, y + (j*scale) + js, sprite->GetPixel(i + ox, j + oy));
+							Draw(x + i*scale + is, y + j*scale + js, sprite->GetPixel(i + ox, j + oy));
 		}
 		else
 		{
@@ -1596,7 +1597,7 @@ namespace olc
 		}
 	}
 
-	void PixelGameEngine::DrawString(int32_t x, int32_t y, std::string sText, Pixel col, uint32_t scale)
+	void PixelGameEngine::DrawString(int32_t x, int32_t y, const std::string& sText, Pixel col, uint32_t scale)
 	{
 		int32_t sx = 0;
 		int32_t sy = 0;
@@ -1621,7 +1622,7 @@ namespace olc
 							if (fontSprite->GetPixel(i + ox * 8, j + oy * 8).r > 0)
 								for (uint32_t is = 0; is < scale; is++)
 									for (uint32_t js = 0; js < scale; js++)
-										Draw(x + sx + (i*scale) + is, y + sy + (j*scale) + js, col);
+										Draw(x + sx + i*scale + is, y + sy + j*scale + js, col);
 				}
 				else
 				{
@@ -1648,7 +1649,7 @@ namespace olc
 
 	void PixelGameEngine::SetPixelMode(std::function<olc::Pixel(const int x, const int y, const olc::Pixel&, const olc::Pixel&)> pixelMode)
 	{
-		funcPixelMode = pixelMode;
+		funcPixelMode = std::move(pixelMode);
 		nPixelMode = Pixel::Mode::CUSTOM;
 	}
 
@@ -1714,8 +1715,8 @@ namespace olc
 			y -= nViewY;
 		}
 
-		nMousePosXcache = (int32_t)(((float)x / (float)(nWindowWidth - (nViewX * 2)) * (float)nScreenWidth));
-		nMousePosYcache = (int32_t)(((float)y / (float)(nWindowHeight - (nViewY * 2)) * (float)nScreenHeight));
+		nMousePosXcache = (int32_t)((float)x / (float)(nWindowWidth - nViewX * 2) * (float)nScreenWidth);
+		nMousePosYcache = (int32_t)((float)y / (float)(nWindowHeight - nViewY * 2) * (float)nScreenHeight);
 
 		if (nMousePosXcache >= (int32_t)nScreenWidth)
 			nMousePosXcache = nScreenWidth - 1;
@@ -1915,10 +1916,10 @@ namespace olc
 
 				// Display texture on screen
 				glBegin(GL_QUADS);
-					glTexCoord2f(0.0, 1.0); glVertex3f(-1.0f + (fSubPixelOffsetX), -1.0f + (fSubPixelOffsetY), 0.0f);
-					glTexCoord2f(0.0, 0.0); glVertex3f(-1.0f + (fSubPixelOffsetX),  1.0f + (fSubPixelOffsetY), 0.0f);
-					glTexCoord2f(1.0, 0.0); glVertex3f( 1.0f + (fSubPixelOffsetX),  1.0f + (fSubPixelOffsetY), 0.0f);
-					glTexCoord2f(1.0, 1.0); glVertex3f( 1.0f + (fSubPixelOffsetX), -1.0f + (fSubPixelOffsetY), 0.0f);
+					glTexCoord2f(0.0, 1.0); glVertex3f(-1.0f + fSubPixelOffsetX, -1.0f + fSubPixelOffsetY, 0.0f);
+					glTexCoord2f(0.0, 0.0); glVertex3f(-1.0f + fSubPixelOffsetX,  1.0f + fSubPixelOffsetY, 0.0f);
+					glTexCoord2f(1.0, 0.0); glVertex3f( 1.0f + fSubPixelOffsetX,  1.0f + fSubPixelOffsetY, 0.0f);
+					glTexCoord2f(1.0, 1.0); glVertex3f( 1.0f + fSubPixelOffsetX, -1.0f + fSubPixelOffsetY, 0.0f);
 				glEnd();
 
 				// Present Graphics to screen
@@ -2021,7 +2022,7 @@ namespace olc
 
 			for (int i = 0; i < 24; i++)
 			{
-				int k = r & (1 << i) ? 255 : 0;
+				int k = r & 1 << i ? 255 : 0;
 				fontSprite->SetPixel(px, py, olc::Pixel(k, k, k, k));
 				if (++py == 48) { px++; py = 0; }
 			}
@@ -2160,7 +2161,7 @@ namespace olc
 		case WM_MOUSEMOVE:
 		{
 			uint16_t x = lParam & 0xFFFF;				// Thanks @ForAbby (Discord)
-			uint16_t y = (lParam >> 16) & 0xFFFF;
+			uint16_t y = lParam >> 16 & 0xFFFF;
 			int16_t ix = *(int16_t*)&x;
 			int16_t iy = *(int16_t*)&y;
 			sge->olc_UpdateMouse(ix, iy);
@@ -2168,7 +2169,7 @@ namespace olc
 		}
 		case WM_SIZE:
 		{
-			sge->olc_UpdateWindowSize(lParam & 0xFFFF, (lParam >> 16) & 0xFFFF);
+			sge->olc_UpdateWindowSize(lParam & 0xFFFF, lParam >> 16 & 0xFFFF);
 			return 0;
 		}
 		case WM_MOUSEWHEEL:
