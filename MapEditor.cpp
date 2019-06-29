@@ -53,10 +53,6 @@ typedef struct EditorResources {
 };
 
 struct TileInfo {
-	int x;
-	int y;
-	int xo;
-	int yo;
 	int tileNumber;
     bool solid;
 };
@@ -101,9 +97,7 @@ class MapEditor : public PixelGameEngine{
 	string exe_path = GetExePath();
 
 	TileInfo* map_info = {};
-	TileInfo* backup = {};
-	int pointer_size = 0;
-	int old_pointer_size = 0;
+	TileInfo* canvas = {};
 
     Pixel * bg_col = nullptr;
 
@@ -113,10 +107,8 @@ public:
 	void EncodeOneStep(const string& filename, vector<unsigned char>& image, unsigned width, unsigned height) const;
 	void LoadConvert() const;
 	void ResizeConvert() const;
-	void NewMapInfo(int width, int height);
+	void ResizeMapInfo();
 	void PopulateTileInfo();
-	void BackupTileInfo();
-	void RestoreTileInfo();
 
     bool OnUserCreate() override {
         sAppName = "Map Editor";
@@ -155,8 +147,8 @@ public:
             // offset eyedropper
             if (GetKey(CTRL).bHeld && GetMouse(0).bHeld) {
 	            auto index = mouseY * n_width + mouseX;                
-                if (map_info[index].tileNumber != -1) {
-	                auto idx = map_info[index].tileNumber;
+                if (canvas[index].tileNumber != -1) {
+	                auto idx = canvas[index].tileNumber;
 	                auto sx = idx % 10;
 	                auto sy = idx / 10;
                     offsetx = sx * tile_size;
@@ -171,39 +163,33 @@ public:
             // Place tile
             else if (GetMouse(0).bHeld) {
                 if (offsetx != -1 && offsety != -1) {
-	                auto index = mouseY * n_width + mouseX;
 					auto index2 = mouseY * canvas_width + mouseX;
 	                auto tileIndex = (offsety * res->tMap->spr->width / tile_size + offsetx) / tile_size;
-					map_info[index2].x = mouseX;
-					map_info[index2].y = mouseY;
-					map_info[index2].xo = tileIndex;
-					map_info[index].tileNumber = tileIndex;
+					canvas[index2].tileNumber = tileIndex;
                     amount_drawn++;
                 }
             }
 
             // Remove tile
             else if (GetMouse(1).bHeld) {
-	            auto index = mouseY * n_width + mouseX;
-                if (map_info[index].tileNumber != -1)
+				auto index = mouseY * n_width + mouseX;
+				auto index2 = mouseY * canvas_width + mouseX;
+            	if (canvas[index].tileNumber != -1)
                     amount_drawn--;
-				map_info[index].x = -1;
-				map_info[index].y = -1;
-				map_info[index].xo = -1;
-				map_info[index].tileNumber = -1;
-                map_info[index].solid = false;
+				canvas[index2].tileNumber = -1;
+				canvas[index2].solid = false;
             }
 
             // Turn solid state off
             else if (GetKey(SHIFT).bHeld && GetMouse(2).bHeld) {
-	            auto index = mouseY * n_width + mouseX;
-                map_info[index].solid = false;
+	            auto index = mouseY * canvas_width + mouseX;
+				canvas[index].solid = false;
             }
 
             // Turn solid state on
             else if (GetMouse(2).bHeld) {
-	            auto index = mouseY * n_width + mouseX;
-                map_info[index].solid = true;
+	            auto index = mouseY * canvas_width + mouseX;
+				canvas[index].solid = true;
             }
         }
 /*
@@ -229,17 +215,16 @@ public:
 			// Draw tiles to screen
 			for (auto y = 0; y < canvas_height; y++) {
 				for (auto x = 0; x < canvas_width; x++) {
-					auto idx = map_info[y * canvas_width + x].xo;
+					auto idx = canvas[y * canvas_width + x].tileNumber;
 					auto sx = idx % 10;
 					auto sy = idx / 10;
-					if (map_info[y * canvas_width + x].x != -1) {
+					if (canvas[y * canvas_width + x].tileNumber != -1) {
 						DrawPartialSprite(x * tile_size, y * tile_size, res->tMap->spr, sx * tile_size, sy * tile_size, tile_size, tile_size);
-						if (map_info[y * canvas_width + x].solid)
+						if (canvas[y * canvas_width + x].solid)
 							DrawRect(x * tile_size, y * tile_size, tile_size - 1, tile_size - 1, RED);
 					}
 				}
 			}
-
 		}
 
         if (GetMouseX() / tile_size <= canvas_width -1 && GetMouseY() / tile_size <= canvas_height -1) {
@@ -336,8 +321,7 @@ public:
 					if (height_sum != 0)
 						n_height = height_sum;
 
-					NewMapInfo(n_width, n_height);
-					//ResizeConvert();
+					ResizeMapInfo();
 					text_mode = 0;
 				}
 			}
@@ -359,8 +343,8 @@ public:
 
 		// Save As
 		if (GetKey(F4).bPressed) {
+			ResizeConvert();
 			OpenLevel("Save");
-
 			ofstream out(level_full_path, ios::out | ios::trunc | ios::binary);
 			if (out.is_open()) {
 				out << tilemap_full_path;
@@ -369,8 +353,9 @@ public:
 				out << endl;
 				for (auto y = 0; y < n_height; y++) {
 					for (auto x = 0; x < n_width; x++) {
-						out << map_info[y * n_width + x].tileNumber << " ";
-						out << map_info[y * n_width + x].solid << " ";
+						const auto index = y * n_width + x;
+						out << map_info[index].tileNumber << " ";
+						out << map_info[index].solid << " ";
 					}
 				}
 			}
@@ -380,6 +365,7 @@ public:
 
 		// Save Level
 		if (GetKey(F5).bPressed) {
+			ResizeConvert();
 			if (level_full_path.empty()) 
 				OpenLevel("Save");
 
@@ -391,8 +377,9 @@ public:
 				out << endl;
 				for (auto y = 0; y < n_height; y++) {
 					for (auto x = 0; x < n_width; x++) {
-						out << map_info[y * n_width + x].tileNumber << " ";
-						out << map_info[y * n_width + x].solid << " ";
+						const auto index = y * n_width + x;
+						out << map_info[index].tileNumber << " ";
+						out << map_info[index].solid << " ";
 					}
 				}
 			}
@@ -421,11 +408,14 @@ public:
 				for (auto y = 0; y < n_height; y++) {
 					for (auto x = 0; x < n_width; x++) {
 						string boolval;
-						data >> map_info[y * n_width + x].tileNumber >> boolval;
-						boolval == "1" ? 
-							map_info[y * n_width + x].solid = true : 
-							map_info[y * n_width + x].solid = false;
-						if (map_info[y * n_width + x].tileNumber != -1) {
+						const auto index = y * n_width + x;
+						data >> map_info[index].tileNumber >> boolval;
+						if (boolval == "1") 
+							map_info[index].solid = true;
+						else 
+							map_info[index].solid = false;
+
+						if (map_info[index].tileNumber != -1) {
 							amount_drawn++;
 						}
 					}
@@ -518,17 +508,12 @@ void MapEditor::LoadConvert() const {
 			const auto index2 = y * canvas_width + x;
 			if (amount_drawn > 0) {
 				if (map_info[index].tileNumber != -1 && x < n_width && y < n_height) {
-					map_info[index2].x = x;
-					map_info[index2].y = y;
-					map_info[index2].xo = map_info[y * n_width + x].tileNumber;
-					map_info[index2].yo = y * tile_size;
+					canvas[index2].tileNumber = map_info[index].tileNumber;
+					canvas[index2].solid = map_info[index].solid;
 				}
 				else {
-					map_info[index2].x = -1;
-					map_info[index2].y = -1;
-					map_info[index2].xo = -1;
-					map_info[index2].yo = -1;
-					map_info[index2].solid = false;
+					canvas[index2].tileNumber = -1;
+					canvas[index2].solid = false;
 				}
 			}
 		}
@@ -541,58 +526,38 @@ void MapEditor::ResizeConvert() const {
 			if (amount_drawn > 0) {
 				const auto index = y * n_width + x;
 				const auto index2 = y * canvas_width + x;
-				map_info[index].tileNumber = map_info[index2].xo;
+				
+				if (canvas[index2].tileNumber != -1 && x < canvas_width && y < canvas_height) {
+					map_info[index].tileNumber = canvas[index2].tileNumber;
+					map_info[index].solid = canvas[index2].solid;
+				}
+				else {
+					map_info[index].tileNumber = -1;
+					map_info[index].solid = false;
+				}
 			}
 		}
 	}
 }
 
-void MapEditor::PopulateTileInfo() {
-	pointer_size = canvas_width * canvas_height;
+void MapEditor::ResizeMapInfo() {
 	delete[] map_info;
-	delete[] backup;
-	map_info = new TileInfo[pointer_size];
-	for (auto i = 0; i < pointer_size; i++) {
-		map_info[i].x = -1;
-		map_info[i].y = -1;
-		map_info[i].xo = -1;
-		map_info[i].yo = -1;
+	map_info = new TileInfo[n_width * n_height];
+	ResizeConvert();
+}
+
+void MapEditor::PopulateTileInfo() {
+	delete[] canvas;
+	delete[] map_info;
+	canvas = new TileInfo[canvas_width * canvas_height];
+	map_info = new TileInfo[canvas_width * canvas_height];
+	for (auto i = 0; i < canvas_width * canvas_height; i++) {
+		canvas[i].tileNumber = -1;
+		canvas[i].solid = false;
+
 		map_info[i].tileNumber = -1;
 		map_info[i].solid = false;
 	}
-}
-
-void MapEditor::BackupTileInfo() {
-	delete[] backup;
-	backup = new TileInfo[pointer_size];
-	for (auto i = 0; i < pointer_size; i++) {
-		if (i < old_pointer_size) {
-			backup[i] = map_info[i];
-		} else {
-			backup[i].x = -1;
-			backup[i].y = -1;
-			backup[i].xo = -1;
-			backup[i].yo = -1;
-			backup[i].tileNumber = -1;
-			backup[i].solid = false;
-		}
-	}
-}
-
-void MapEditor::RestoreTileInfo() {
-	delete[] map_info;
-	map_info = new TileInfo[pointer_size];
-	for (auto i = 0; i < pointer_size; i++) {
-		map_info[i] = backup[i];
-	}
-}
-
-void MapEditor::NewMapInfo(const int width, const int height) {
-	old_pointer_size = pointer_size;
-	pointer_size = width * height;
-	BackupTileInfo();
-	RestoreTileInfo();
-	LoadConvert();
 }
 
 void MapEditor::OpenLevel(const string& type) {
