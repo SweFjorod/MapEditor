@@ -66,6 +66,10 @@ public:
 };
 
 struct TileInfo {
+	int x;
+	int y;
+	int xo;
+	int yo;
 	int tileNumber;
     bool solid;
 };
@@ -79,7 +83,6 @@ static string GetExePath() {
 }
 
 class MapEditor final : public PixelGameEngine{
-private:
 	EditorResources* res = nullptr;
 	EditorResources* res_button = nullptr;
 
@@ -90,8 +93,10 @@ private:
 	float old_time = 0.0f;
 	float new_time = 0.0f;
 	bool cursor = false;
-	int canvas_width = 31;
-	int canvas_height = 23;
+	static const int canvas_width = 31;
+	static const int canvas_height = 23;
+	float f_camera_pos_x = 0.0f;
+	float f_camera_pos_y = 0.0f;
 
 	int x1 = 0;
     int x2 = 0;
@@ -108,7 +113,9 @@ private:
 
 	string exe_path = GetExePath();
 
-    TileInfo map_info[713] = {};
+	TileInfo* map_info = {};
+	TileInfo* backup = {};
+	int pointer_size = 0;
 
     Pixel * bg_col = nullptr;
 
@@ -116,8 +123,13 @@ public:
 	static void OpenLevel(const string& type);
 	static void SetPaths(const string& type, const string& file_name);
 	void EncodeOneStep(const string& filename, vector<unsigned char>& image, unsigned width, unsigned height) const;
+	void LoadConvert() const;
+	void ResizeConvert() const;
+	void NewMapInfo(int width, int height);
+	void PopulateTileInfo();
+	void BackupTileInfo();
+	void RestoreTileInfo();
 
-public:
     bool OnUserCreate() override {
         sAppName = "Map Editor";
 
@@ -133,10 +145,7 @@ public:
 		n_width = canvas_width;
 		n_height = canvas_height;
 
-        for (auto& i : map_info) {
-	        i.tileNumber = -1;
-	        i.solid = false;
-        }
+		PopulateTileInfo();
 
         return true;
     }
@@ -154,7 +163,7 @@ public:
         Clear(*bg_col);
 
         // Mouse button handling in canvas area
-        if (mouseX <= canvas_width -1 && mouseY <= canvas_height -1) {
+        if (mouseX <= n_width -1 && mouseY <= n_height -1) {
             // offset eyedropper
             if (GetKey(CTRL).bHeld && GetMouse(0).bHeld) {
 	            auto index = mouseY * n_width + mouseX;                
@@ -175,10 +184,12 @@ public:
             else if (GetMouse(0).bHeld) {
                 if (offsetx != -1 && offsety != -1) {
 	                auto index = mouseY * n_width + mouseX;
+					auto index2 = mouseY * canvas_width + mouseX;
 	                auto tileIndex = (offsety * res->tMap->spr->width / tile_size + offsetx) / tile_size;
+					map_info[index2].x = mouseX;
+					map_info[index2].y = mouseY;
+					map_info[index2].xo = tileIndex;
 					map_info[index].tileNumber = tileIndex;
-                    map_info[index].solid = false;
-
                     amount_drawn++;
                 }
             }
@@ -188,6 +199,9 @@ public:
 	            auto index = mouseY * n_width + mouseX;
                 if (map_info[index].tileNumber != -1)
                     amount_drawn--;
+				map_info[index].x = -1;
+				map_info[index].y = -1;
+				map_info[index].xo = -1;
 				map_info[index].tileNumber = -1;
                 map_info[index].solid = false;
             }
@@ -204,20 +218,37 @@ public:
                 map_info[index].solid = true;
             }
         }
+/*
+        auto nVisibleTilesX = canvas_width;
+        auto nVisibleTilesY = canvas_height;
 
+		// Calculate Top-Leftmost visible tile
+        auto fOffsetX = f_camera_pos_x - float(nVisibleTilesX) / 2.0f;
+        auto fOffsetY = f_camera_pos_y - float(nVisibleTilesY) / 2.0f;
+
+		// Clamp camera to game boundaries
+		if (fOffsetX < 0) fOffsetX = 0;
+		if (fOffsetY < 0) fOffsetY = 0;
+		if (fOffsetX > float(n_width) - nVisibleTilesX) fOffsetX = n_width - nVisibleTilesX;
+		if (fOffsetY > float(n_height) - nVisibleTilesY) fOffsetY = n_height - nVisibleTilesY;
+
+		// Get offsets for smooth movement
+        auto fTileOffsetX = (fOffsetX - int(fOffsetX)) * tile_size;
+        auto fTileOffsetY = (fOffsetY - int(fOffsetY)) * tile_size;
+*/
 		// Draw visible tile map
 		if (amount_drawn > 0) {
 			// Draw tiles to screen
-			for (auto y = 0; y < n_height; y++) {
-				for (auto x = 0; x < n_width; x++) {
-					auto idx = map_info[y * n_width + x].tileNumber;
+			for (auto y = 0; y < canvas_height; y++) {
+				for (auto x = 0; x < canvas_width; x++) {
+					auto idx = map_info[y * canvas_width + x].xo;
 					auto sx = idx % 10;
 					auto sy = idx / 10;
-					if (map_info[y * n_width + x].tileNumber != -1)
+					if (map_info[y * canvas_width + x].x != -1) {
 						DrawPartialSprite(x * tile_size, y * tile_size, res->tMap->spr, sx * tile_size, sy * tile_size, tile_size, tile_size);
-					if (map_info[y * n_width + x].solid)
-						DrawRect(x * tile_size, y * tile_size, tile_size - 1, tile_size - 1, RED);
-
+						if (map_info[y * canvas_width + x].solid)
+							DrawRect(x * tile_size, y * tile_size, tile_size - 1, tile_size - 1, RED);
+					}
 				}
 			}
 
@@ -316,6 +347,9 @@ public:
 						n_width = width_sum;
 					if (height_sum != 0)
 						n_height = height_sum;
+
+					NewMapInfo(n_width, n_height);
+					ResizeConvert();
 					text_mode = 0;
 				}
 			}
@@ -410,6 +444,7 @@ public:
 				}
 
 				data.close();
+				LoadConvert();
 			}
 		}
 		
@@ -486,6 +521,103 @@ void MapEditor::EncodeOneStep(const string& filename, vector<unsigned char>& ima
 	//if there's an error, display it
 	if (error)
 		cout << "encoder error " << error << ": " << lodepng_error_text(error) << endl;
+}
+
+void MapEditor::LoadConvert() const {
+	for (auto y = 0; y < canvas_height; y++) {
+		for (auto x = 0; x < canvas_width; x++) {
+			const auto index = y * n_width + x;
+			const auto index2 = y * canvas_width + x;
+			if (amount_drawn > 0) {
+				if (map_info[index].tileNumber != -1 && x < n_width && y < n_height) {
+					map_info[index2].x = x;
+					map_info[index2].y = y;
+					map_info[index2].xo = map_info[y * n_width + x].tileNumber;
+					map_info[index2].yo = y * tile_size;
+				}
+				else {
+					map_info[index2].x = -1;
+					map_info[index2].y = -1;
+					map_info[index2].xo = -1;
+					map_info[index2].yo = -1;
+					map_info[index2].solid = false;
+				}
+			}
+		}
+	}
+}
+
+void MapEditor::ResizeConvert() const {
+	for (auto y = 0; y < n_height; y++) {
+		for (auto x = 0; x < n_width; x++) {
+			if (amount_drawn > 0) {
+				const auto index = y * n_width + x;
+				const auto index2 = y * canvas_width + x;
+				map_info[index].tileNumber = map_info[index2].xo;
+			}
+		}
+	}
+}
+
+void MapEditor::PopulateTileInfo() {
+	pointer_size = canvas_width * canvas_height;
+	delete[] map_info;
+	delete[] backup;
+	map_info = new TileInfo[pointer_size];
+	backup = new TileInfo[pointer_size];
+	for (auto i = 0; i <= pointer_size; i++) {
+		map_info[i].x = -1;
+		map_info[i].y = -1;
+		map_info[i].xo = -1;
+		map_info[i].yo = -1;
+		map_info[i].tileNumber = -1;
+		map_info[i].solid = false;
+
+		backup[i].x = -1;
+		backup[i].y = -1;
+		backup[i].xo = -1;
+		backup[i].yo = -1;
+		backup[i].tileNumber = -1;
+		backup[i].solid = false;
+	}
+}
+
+void MapEditor::BackupTileInfo() {
+	delete[] backup;
+	backup = new TileInfo[pointer_size];
+	for (auto i = 0; i <= pointer_size; i++) {
+		backup[i].x = -1;
+		backup[i].y = -1;
+		backup[i].xo = -1;
+		backup[i].yo = -1;
+		backup[i].tileNumber = -1;
+		backup[i].solid = false;
+		if (map_info[i].solid || !map_info[i].solid) {
+			backup[i] = map_info[i];
+		}
+	}
+}
+
+void MapEditor::RestoreTileInfo() {
+	delete[] map_info;
+	map_info = new TileInfo[pointer_size];
+	for (auto i = 0; i <= pointer_size; i++) {
+		map_info[i].x = -1;
+		map_info[i].y = -1;
+		map_info[i].xo = -1;
+		map_info[i].yo = -1;
+		map_info[i].tileNumber = -1;
+		map_info[i].solid = false;
+		if (backup[i].solid || !backup[i].solid) {
+			map_info[i] = backup[i];
+		}
+	}
+}
+
+void MapEditor::NewMapInfo(const int width, const int height) {
+	pointer_size = width * height;
+	BackupTileInfo();
+	RestoreTileInfo();
 }
 
 void MapEditor::OpenLevel(const string& type) {
