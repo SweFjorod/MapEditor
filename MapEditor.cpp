@@ -39,29 +39,16 @@ path tilemap_name_no_extension;
 string ReturnExePath();
 
 typedef struct Tilemap {
-
-public:
 	explicit Tilemap(Sprite* sprite);
-
 	~Tilemap();
-
-public:
     Sprite *spr;
-
-public:
 	void SetSprite(Sprite* sprite);
 };
 
 typedef struct EditorResources {
-public:
 	explicit EditorResources(string path);
-
 	~EditorResources();
-
-public:
 	Tilemap* tMap;
-
-public:
 	void LoadTilemapFile(string path);
 };
 
@@ -82,7 +69,7 @@ static string GetExePath() {
 	return newpath;
 }
 
-class MapEditor final : public PixelGameEngine{
+class MapEditor : public PixelGameEngine{
 	EditorResources* res = nullptr;
 	EditorResources* res_button = nullptr;
 
@@ -116,6 +103,7 @@ class MapEditor final : public PixelGameEngine{
 	TileInfo* map_info = {};
 	TileInfo* backup = {};
 	int pointer_size = 0;
+	int old_pointer_size = 0;
 
     Pixel * bg_col = nullptr;
 
@@ -349,7 +337,7 @@ public:
 						n_height = height_sum;
 
 					NewMapInfo(n_width, n_height);
-					ResizeConvert();
+					//ResizeConvert();
 					text_mode = 0;
 				}
 			}
@@ -564,36 +552,29 @@ void MapEditor::PopulateTileInfo() {
 	delete[] map_info;
 	delete[] backup;
 	map_info = new TileInfo[pointer_size];
-	backup = new TileInfo[pointer_size];
-	for (auto i = 0; i <= pointer_size; i++) {
+	for (auto i = 0; i < pointer_size; i++) {
 		map_info[i].x = -1;
 		map_info[i].y = -1;
 		map_info[i].xo = -1;
 		map_info[i].yo = -1;
 		map_info[i].tileNumber = -1;
 		map_info[i].solid = false;
-
-		backup[i].x = -1;
-		backup[i].y = -1;
-		backup[i].xo = -1;
-		backup[i].yo = -1;
-		backup[i].tileNumber = -1;
-		backup[i].solid = false;
 	}
 }
 
 void MapEditor::BackupTileInfo() {
 	delete[] backup;
 	backup = new TileInfo[pointer_size];
-	for (auto i = 0; i <= pointer_size; i++) {
-		backup[i].x = -1;
-		backup[i].y = -1;
-		backup[i].xo = -1;
-		backup[i].yo = -1;
-		backup[i].tileNumber = -1;
-		backup[i].solid = false;
-		if (map_info[i].solid || !map_info[i].solid) {
+	for (auto i = 0; i < pointer_size; i++) {
+		if (i < old_pointer_size) {
 			backup[i] = map_info[i];
+		} else {
+			backup[i].x = -1;
+			backup[i].y = -1;
+			backup[i].xo = -1;
+			backup[i].yo = -1;
+			backup[i].tileNumber = -1;
+			backup[i].solid = false;
 		}
 	}
 }
@@ -601,23 +582,17 @@ void MapEditor::BackupTileInfo() {
 void MapEditor::RestoreTileInfo() {
 	delete[] map_info;
 	map_info = new TileInfo[pointer_size];
-	for (auto i = 0; i <= pointer_size; i++) {
-		map_info[i].x = -1;
-		map_info[i].y = -1;
-		map_info[i].xo = -1;
-		map_info[i].yo = -1;
-		map_info[i].tileNumber = -1;
-		map_info[i].solid = false;
-		if (backup[i].solid || !backup[i].solid) {
-			map_info[i] = backup[i];
-		}
+	for (auto i = 0; i < pointer_size; i++) {
+		map_info[i] = backup[i];
 	}
 }
 
 void MapEditor::NewMapInfo(const int width, const int height) {
+	old_pointer_size = pointer_size;
 	pointer_size = width * height;
 	BackupTileInfo();
 	RestoreTileInfo();
+	LoadConvert();
 }
 
 void MapEditor::OpenLevel(const string& type) {
