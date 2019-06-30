@@ -321,6 +321,8 @@ public:
 					if (height_sum != 0)
 						n_height = height_sum;
 
+					width_sum = 0;
+					height_sum = 0;
 					ResizeMapInfo();
 					text_mode = 0;
 				}
@@ -405,6 +407,8 @@ public:
 					if (tilemap_extension == ".spr") 
 						res->tMap->SetSprite(SprConverter::convertSmartBlendedPixels(tilemap_full_path, 1));
 				}
+
+				ResizeMapInfo();
 				for (auto y = 0; y < n_height; y++) {
 					for (auto x = 0; x < n_width; x++) {
 						string boolval;
@@ -523,18 +527,16 @@ void MapEditor::LoadConvert() const {
 void MapEditor::ResizeConvert() const {
 	for (auto y = 0; y < n_height; y++) {
 		for (auto x = 0; x < n_width; x++) {
-			if (amount_drawn > 0) {
-				const auto index = y * n_width + x;
-				const auto index2 = y * canvas_width + x;
-				
-				if (canvas[index2].tileNumber != -1 && x < canvas_width && y < canvas_height) {
-					map_info[index].tileNumber = canvas[index2].tileNumber;
-					map_info[index].solid = canvas[index2].solid;
-				}
-				else {
-					map_info[index].tileNumber = -1;
-					map_info[index].solid = false;
-				}
+			const auto index = y * n_width + x;
+			const auto index2 = y * canvas_width + x;
+
+			if (canvas[index2].tileNumber != -1 && x < canvas_width && y < canvas_height) {
+				map_info[index].tileNumber = canvas[index2].tileNumber;
+				map_info[index].solid = canvas[index2].solid;
+			}
+			else {
+				map_info[index].tileNumber = -1;
+				map_info[index].solid = false;
 			}
 		}
 	}
