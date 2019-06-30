@@ -143,7 +143,7 @@ public:
         Clear(*bg_col);
 
         // Mouse button handling in canvas area
-        if (mouseX <= n_width -1 && mouseY <= n_height -1) {
+        if (mouseX < n_width && mouseX < canvas_width && mouseY < n_height && mouseY < canvas_height) {
             // offset eyedropper
             if (GetKey(CTRL).bHeld && GetMouse(0).bHeld) {
 	            auto index = mouseY * n_width + mouseX;                
