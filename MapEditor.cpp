@@ -25,7 +25,7 @@ using namespace std::experimental::filesystem;
 
 constexpr auto tile_size = 16;
 
-//  Path variables
+// Path variables
 string level_full_path;
 path level_path;
 path level_name;
@@ -35,7 +35,13 @@ path tilemap_name;
 path tilemap_extension;
 path tilemap_name_no_extension;
 
-//static string GetExePath();
+// Mouse variables
+int mouseX;
+int mouseY;
+
+// Camera variables
+bool cameraChanged;
+
 string ReturnExePath();
 
 typedef struct Tilemap {
@@ -76,10 +82,10 @@ class MapEditor : public PixelGameEngine{
 	float old_time = 0.0f;
 	float new_time = 0.0f;
 	bool cursor = false;
-	static const int canvas_width = 31;
-	static const int canvas_height = 23;
-	float f_camera_pos_x = 0.0f;
-	float f_camera_pos_y = 0.0f;
+	static const int camera_width = 31;
+	static const int camera_height = 23;
+	int cameraOffsetX = 0;
+	int cameraOffsetY = 0;
 
 	int x1 = 0;
     int x2 = 0;
@@ -92,12 +98,14 @@ class MapEditor : public PixelGameEngine{
     int offsetx = 0;
     int offsety = 0;
 
-    int amount_drawn = 0;
+	int backup_width = 0;
+	int backup_height = 0;
 
 	string exe_path = GetExePath();
 
 	TileInfo* map_info = {};
-	TileInfo* canvas = {};
+	TileInfo* camera = {};
+	TileInfo* backup = {};
 
     Pixel * bg_col = nullptr;
 
@@ -105,10 +113,14 @@ public:
 	static void OpenLevel(const string& type);
 	static void SetPaths(const string& type, const string& file_name);
 	void EncodeOneStep(const string& filename, vector<unsigned char>& image, unsigned width, unsigned height) const;
-	void LoadConvert() const;
 	void ResizeConvert() const;
-	void ResizeMapInfo();
+	void RestoreMapInfo();
 	void PopulateTileInfo();
+	void CheckKeyPressed();
+	void SimulatedInputField(float fElapsedTime);
+	void MouseClickingInCameraView();
+	void UpdateCamera() const;
+	void BackupMapInfo();
 
     bool OnUserCreate() override {
         sAppName = "Map Editor";
@@ -120,142 +132,76 @@ public:
         offsetx = -1;
         offsety = -1;
 
-        amount_drawn = 0;
-
-		n_width = canvas_width;
-		n_height = canvas_height;
+		n_width = 31;
+		n_height = 23;
+		cameraChanged = true;
 
 		PopulateTileInfo();
 
         return true;
     }
 
-    bool OnUserUpdate(float fElapsedTime) override {
-        // Get mouse position
-        auto mouseX = GetMouseX() / tile_size;
-        auto mouseY = GetMouseY() / tile_size;
-        auto actualMouseX = GetMouseX();
-        auto actualMouseY = GetMouseY();
-		auto _nWidthOffset = to_string(n_width).length() * 8;
-		auto _widthSumOffset = to_string(width_sum).length() * 8;
-		auto _heightSumOffset = to_string(height_sum).length() * 8;
+    bool OnUserUpdate(const float fElapsedTime) override {
+		const auto actualMouseX = GetMouseX();
+		const auto actualMouseY = GetMouseY();
+		mouseX = actualMouseX / tile_size;
+		mouseY = actualMouseY / tile_size;
+
+		const auto _nWidthOffset = to_string(n_width).length() * 8;
 
         Clear(*bg_col);
 
-        // Mouse button handling in canvas area
-        if (mouseX < n_width && mouseX < canvas_width && mouseY < n_height && mouseY < canvas_height) {
-            // offset eyedropper
-            if (GetKey(CTRL).bHeld && GetMouse(0).bHeld) {
-	            auto index = mouseY * n_width + mouseX;                
-                if (canvas[index].tileNumber != -1) {
-	                auto idx = canvas[index].tileNumber;
-	                auto sx = idx % 10;
-	                auto sy = idx / 10;
-                    offsetx = sx * tile_size;
-                    offsety = sy * tile_size;
-                    x1 = offsetx + 504;
-                    x2 = tile_size - 1;
-                    y1 = offsety + 40;
-                    y2 = tile_size - 1;
-                }
-            }
-
-            // Place tile
-            else if (GetMouse(0).bHeld) {
-                if (offsetx != -1 && offsety != -1) {
-					auto index2 = mouseY * canvas_width + mouseX;
-	                auto tileIndex = (offsety * res->tMap->spr->width / tile_size + offsetx) / tile_size;
-					canvas[index2].tileNumber = tileIndex;
-                    amount_drawn++;
-                }
-            }
-
-            // Remove tile
-            else if (GetMouse(1).bHeld) {
-				auto index = mouseY * n_width + mouseX;
-				auto index2 = mouseY * canvas_width + mouseX;
-            	if (canvas[index].tileNumber != -1)
-                    amount_drawn--;
-				canvas[index2].tileNumber = -1;
-				canvas[index2].solid = false;
-            }
-
-            // Turn solid state off
-            else if (GetKey(SHIFT).bHeld && GetMouse(2).bHeld) {
-	            auto index = mouseY * canvas_width + mouseX;
-				canvas[index].solid = false;
-            }
-
-            // Turn solid state on
-            else if (GetMouse(2).bHeld) {
-	            auto index = mouseY * canvas_width + mouseX;
-				canvas[index].solid = true;
-            }
+        // Mouse button handling in camera area
+        if (mouseX < n_width && mouseX < camera_width && mouseY < n_height && mouseY < camera_height) {
+			MouseClickingInCameraView();
         }
-/*
-        auto nVisibleTilesX = canvas_width;
-        auto nVisibleTilesY = canvas_height;
 
-		// Calculate Top-Leftmost visible tile
-        auto fOffsetX = f_camera_pos_x - float(nVisibleTilesX) / 2.0f;
-        auto fOffsetY = f_camera_pos_y - float(nVisibleTilesY) / 2.0f;
-
-		// Clamp camera to game boundaries
-		if (fOffsetX < 0) fOffsetX = 0;
-		if (fOffsetY < 0) fOffsetY = 0;
-		if (fOffsetX > float(n_width) - nVisibleTilesX) fOffsetX = n_width - nVisibleTilesX;
-		if (fOffsetY > float(n_height) - nVisibleTilesY) fOffsetY = n_height - nVisibleTilesY;
-
-		// Get offsets for smooth movement
-        auto fTileOffsetX = (fOffsetX - int(fOffsetX)) * tile_size;
-        auto fTileOffsetY = (fOffsetY - int(fOffsetY)) * tile_size;
-*/
-		// Draw visible tile map
-		if (amount_drawn > 0) {
-			// Draw tiles to screen
-			for (auto y = 0; y < canvas_height; y++) {
-				for (auto x = 0; x < canvas_width; x++) {
-					auto idx = canvas[y * canvas_width + x].tileNumber;
-					auto sx = idx % 10;
-					auto sy = idx / 10;
-					if (canvas[y * canvas_width + x].tileNumber != -1) {
-						DrawPartialSprite(x * tile_size, y * tile_size, res->tMap->spr, sx * tile_size, sy * tile_size, tile_size, tile_size);
-						if (canvas[y * canvas_width + x].solid)
-							DrawRect(x * tile_size, y * tile_size, tile_size - 1, tile_size - 1, RED);
-					}
+		// Draw visible tiles to screen
+		for (auto y = 0; y < camera_height; y++) {
+			for (auto x = 0; x < camera_width; x++) {
+				const auto idx = camera[y * camera_width + x].tileNumber;
+				const auto sx = idx % 10;
+				const auto sy = idx / 10;
+				if (camera[y * camera_width + x].tileNumber != -1) {
+					DrawPartialSprite(x * tile_size, y * tile_size, res->tMap->spr, sx * tile_size, sy * tile_size, tile_size, tile_size);
+					if (camera[y * camera_width + x].solid)
+						DrawRect(x * tile_size, y * tile_size, tile_size - 1, tile_size - 1, RED);
 				}
 			}
 		}
 
-        if (GetMouseX() / tile_size <= canvas_width -1 && GetMouseY() / tile_size <= canvas_height -1) {
-            // Draw outline where mouse is
-            DrawRect(mouseX * tile_size, mouseY * tile_size, tile_size - 1, tile_size - 1, YELLOW);
+		DrawString(740, 395, "(" + to_string(actualMouseX) + "," + to_string(actualMouseY) + ")", WHITE, 1);
+		
+    	if (actualMouseX / tile_size < camera_width && actualMouseY / tile_size < camera_height) {
+	        // Draw outline where mouse is
+	        DrawRect(mouseX * tile_size, mouseY * tile_size, tile_size - 1, tile_size - 1, YELLOW);
 
-            // Draw mouse coords to screen
-            DrawString(634, 395, "(" + to_string(mouseX) + "," + to_string(mouseY) + ")", WHITE, 1);
-		}
+	        // Draw mouse coords to screen
+	        DrawString(740, 405, "(" + to_string(mouseX + cameraOffsetX) + "," + to_string(mouseY + cameraOffsetY) + ")", WHITE, 1);
+        }
         else {
-            if (GetMouse(0).bPressed) {
-                // Check if mouse is on top of tilemap
-                if (GetMouseX() >= 504 && GetMouseX() < 504 + res->tMap->spr->width &&
-                    GetMouseY() >= 40 && GetMouseY() < 40 + res->tMap->spr->height) {
-					x1 = static_cast<int>(actualMouseX - 504) / tile_size * tile_size + 504;
-                    x2 = tile_size - 1;
-					y1 = static_cast<int>(actualMouseY - 40) / tile_size * tile_size + 40;
-                    y2 = x2;
+	        if (GetMouse(0).bPressed) {
+		        // Check if mouse is on top of tilemap
+		        if (actualMouseX >= 504 && actualMouseX < 504 + res->tMap->spr->width &&
+			        actualMouseY >= 40 && actualMouseY < 40 + res->tMap->spr->height) {
+			        x1 = (actualMouseX - 504) / tile_size * tile_size + 504;
+			        x2 = tile_size - 1;
+			        y1 = (actualMouseY - 40) / tile_size * tile_size + 40;
+			        y2 = x2;
 
-                    offsetx = static_cast<int>(actualMouseX - 504) / tile_size * tile_size;
-                    offsety = static_cast<int>(actualMouseY - 40) / tile_size * tile_size;
-                }
+			        offsetx = (actualMouseX - 504) / tile_size * tile_size;
+			        offsety = (actualMouseY - 40) / tile_size * tile_size;
+		        }
 
-				if (GetMouseX() >= 616 + _nWidthOffset && GetMouseX() < 616 + _nWidthOffset + res_button->tMap->spr->width &&
-					GetMouseY() >= 8 && GetMouseY() < 8 + res_button->tMap->spr->height) {
-					width_sum = 0;
-					height_sum = 0;
-					input_number = 0;
-					text_mode = 1;
-				}
-            }
+		        // Check if mouse is on top of Edit button
+		        if (actualMouseX >= 616 + _nWidthOffset && actualMouseX < 616 + _nWidthOffset + res_button->tMap->spr->width &&
+			        actualMouseY >= 8 && actualMouseY < 8 + res_button->tMap->spr->height) {
+			        width_sum = 0;
+			        height_sum = 0;
+			        input_number = 0;
+			        text_mode = 1;
+		        }
+	        }
         }
 
 		// Draw Menu and help
@@ -268,72 +214,14 @@ public:
 			DrawSprite(616 + _nWidthOffset, 8, res_button->tMap->spr);
 			SetPixelMode(Pixel::NORMAL);
 
-		}
-		// Draw simulated input field
-		else {
-			if (text_mode == 1) 
-				DrawString(5, 375, "New Level Width: ");
-			else 
-				DrawString(5, 375, "New Level Height: ");;
-
-			for (auto i = 0; i < 10; i++) {
-				if (GetKey(static_cast<Key>(int(K0) + i)).bPressed) input_number += '0' + i;
-			}
-
-			if (text_mode != 0) {
-				// Draw simulated cursor
-				new_time = new_time + fElapsedTime;
-				if (new_time > old_time) {
-					cursor = !cursor;
-					old_time = new_time + 0.5f;
-				}
-
-				if (cursor)
-					if (text_mode == 1) 
-						DrawString(width_sum > 0 ? 135 + _widthSumOffset : 135, 375, "_");
-					else 
-						DrawString(height_sum > 0 ? 145 + _heightSumOffset : 145, 375, "_");
-
-				// Draw numbers to simulated input field
-				if(width_sum > 0 && text_mode == 1)
-					DrawString(135, 375, to_string(width_sum));
-				if(height_sum > 0 && text_mode == 2)
-					DrawString(145, 375, to_string(height_sum));
-
-				if (input_number != 0) {
-					if (text_mode == 1) 
-						width_sum = width_sum * 10 + input_number - 48;
-					else 
-						height_sum = height_sum * 10 + input_number - 48;
-					input_number = 0;
-				}
-
-				if (GetKey(BACK).bPressed)
-					text_mode == 1 ? width_sum /= 10 : height_sum /= 10;
-
-				if (GetKey(ENTER).bPressed) {
-					text_mode++;
-				}
-
-				if (text_mode >= 3) {
-					if(width_sum != 0)
-						n_width = width_sum;
-					if (height_sum != 0)
-						n_height = height_sum;
-
-					width_sum = 0;
-					height_sum = 0;
-					ResizeMapInfo();
-					text_mode = 0;
-				}
-			}
-		}
+		} else
+			SimulatedInputField(fElapsedTime);
 
         // Draw tilemap to screen
         DrawLine(497, 0, 497, 369, DARK_GREY);
         DrawLine(0, 369, 497, 369, DARK_GREY);
-        auto _path = tilemap_name;
-        auto _path_string = _path.u8string();
+        const auto _path = tilemap_name;
+        const auto _path_string = _path.u8string();
 		DrawString(504, 10, "Level Width : " + to_string(n_width));
 		DrawString(504, 20, "Level Height: " + to_string(n_height));
 		DrawString(504, 30, "Tilemap: " + _path_string);
@@ -343,124 +231,7 @@ public:
         if (x1 != NULL)
             DrawRect(x1, y1, x2, y2, YELLOW);
 
-		// Save As
-		if (GetKey(F4).bPressed) {
-			ResizeConvert();
-			OpenLevel("Save");
-			ofstream out(level_full_path, ios::out | ios::trunc | ios::binary);
-			if (out.is_open()) {
-				out << tilemap_full_path;
-				out << endl;
-				out << n_width << " " << n_height;
-				out << endl;
-				for (auto y = 0; y < n_height; y++) {
-					for (auto x = 0; x < n_width; x++) {
-						const auto index = y * n_width + x;
-						out << map_info[index].tileNumber << " ";
-						out << map_info[index].solid << " ";
-					}
-				}
-			}
-
-			out.close();
-		}
-
-		// Save Level
-		if (GetKey(F5).bPressed) {
-			ResizeConvert();
-			if (level_full_path.empty()) 
-				OpenLevel("Save");
-
-			ofstream out(level_full_path, ios::out | ios::trunc | ios::binary);
-			if (out.is_open()) {
-				out << tilemap_full_path;
-				out << endl;
-				out << n_width << " " << n_height;
-				out << endl;
-				for (auto y = 0; y < n_height; y++) {
-					for (auto x = 0; x < n_width; x++) {
-						const auto index = y * n_width + x;
-						out << map_info[index].tileNumber << " ";
-						out << map_info[index].solid << " ";
-					}
-				}
-			}
-			
-			out.close();
-		}
-
-        // Open Level
-		if (GetKey(F8).bPressed) {
-			OpenLevel("Level");
-			ifstream data(level_full_path, ios::in | ios::binary);
-			if (data.is_open()) {
-				data >> tilemap_full_path;
-				data >> n_width >> n_height;
-				if (tilemap_full_path == "-1") {
-					tilemap_full_path = "";
-				}
-
-				if (!tilemap_full_path.empty()) {
-					SetPaths("Tilemap", tilemap_full_path);
-					if (tilemap_extension == ".png") 
-						res->tMap->SetSprite(new Sprite(tilemap_full_path));
-					if (tilemap_extension == ".spr") 
-						res->tMap->SetSprite(SprConverter::convertSmartBlendedPixels(tilemap_full_path, 1));
-				}
-
-				ResizeMapInfo();
-				for (auto y = 0; y < n_height; y++) {
-					for (auto x = 0; x < n_width; x++) {
-						string boolval;
-						const auto index = y * n_width + x;
-						data >> map_info[index].tileNumber >> boolval;
-						if (boolval == "1") 
-							map_info[index].solid = true;
-						else 
-							map_info[index].solid = false;
-
-						if (map_info[index].tileNumber != -1) {
-							amount_drawn++;
-						}
-					}
-				}
-
-				data.close();
-				LoadConvert();
-			}
-		}
-		
-        // Open tilemap
-        if (GetKey(F9).bPressed) {
-			OpenLevel("Tilemap");
-			if (tilemap_extension == ".png") {
-				res->tMap->SetSprite(new Sprite(tilemap_full_path));
-			}
-
-			if (tilemap_extension == ".spr") {
-				res->tMap->SetSprite(SprConverter::convertSmartBlendedPixels(tilemap_full_path, 1));
-			}
-		}
-
-		if (GetKey(F2).bPressed) {
-			if (res != nullptr) {
-				vector<unsigned char> _spriteToVector;
-				auto _width = res->tMap->spr->width;
-				auto _height = res->tMap->spr->height;
-				for (auto y = 0; y < _height; y++) {
-					for (auto x = 0; x < _width; x++) {
-						_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).r);
-						_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).g);
-						_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).b);
-						_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).a);
-					}
-				}
-
-				auto _string = tilemap_name_no_extension.string() + ".png";
-				EncodeOneStep(_string, _spriteToVector, _width, _height);
-			}
-		}
-
+		CheckKeyPressed();
 		return true;
     }
 };
@@ -496,6 +267,284 @@ void EditorResources::LoadTilemapFile(string path) {
 	tMap = new Tilemap(new Sprite(std::move(path)));
 }
 
+void MapEditor::MouseClickingInCameraView() {
+	// offset eyedropper
+	if (GetKey(CTRL).bHeld && GetMouse(0).bHeld) {
+		const auto index = mouseY * n_width + mouseX;
+		if (map_info[index].tileNumber != -1) {
+			const auto idx = map_info[index].tileNumber;
+			const auto sx = idx % 10;
+			const auto sy = idx / 10;
+			offsetx = sx * tile_size;
+			offsety = sy * tile_size;
+			x1 = offsetx + 504;
+			x2 = tile_size - 1;
+			y1 = offsety + 40;
+			y2 = tile_size - 1;
+		}
+	}
+
+	// Place tile
+	else if (GetMouse(0).bHeld) {
+		if (offsetx != -1 && offsety != -1) {
+			const auto index = (mouseY + cameraOffsetY) * n_width + mouseX + cameraOffsetX;
+			const auto tileIndex = (offsety * res->tMap->spr->width / tile_size + offsetx) / tile_size;
+			map_info[index].tileNumber = tileIndex;
+			UpdateCamera();
+		}
+	}
+
+	// Remove tile
+	else if (GetMouse(1).bHeld) {
+		const auto index = (mouseY + cameraOffsetY) * n_width + mouseX + cameraOffsetX;
+		map_info[index].tileNumber = -1;
+		map_info[index].solid = false;
+		UpdateCamera();
+	}
+
+	// Turn solid state off
+	else if (GetKey(SHIFT).bHeld && GetMouse(2).bHeld) {
+		const auto index = (mouseY + cameraOffsetY) * n_width + mouseX + cameraOffsetX;
+		map_info[index].solid = false;
+		UpdateCamera();
+	}
+
+	// Turn solid state on
+	else if (GetMouse(2).bHeld) {
+		const auto index = (mouseY + cameraOffsetY) * n_width + mouseX + cameraOffsetX;
+		map_info[index].solid = true;
+		UpdateCamera();
+	}
+}
+
+
+void MapEditor::SimulatedInputField(const float fElapsedTime) {
+	const auto _widthSumOffset = to_string(width_sum).length() * 8;
+	const auto _heightSumOffset = to_string(height_sum).length() * 8;
+
+	// Draw simulated input field
+	if (text_mode == 1)
+		DrawString(5, 375, "New Level Width: ");
+	else
+		DrawString(5, 375, "New Level Height: ");;
+
+	for (auto i = 0; i < 10; i++) {
+		if (GetKey(static_cast<Key>(int(K0) + i)).bPressed) input_number += '0' + i;
+		if (GetKey(static_cast<Key>(int(NP0) + i)).bPressed) input_number += '0' + i;
+	}
+
+	if (text_mode != 0) {
+		// Draw simulated cursor
+		new_time = new_time + fElapsedTime;
+		if (new_time > old_time) {
+			cursor = !cursor;
+			old_time = new_time + 0.5f;
+		}
+
+		if (cursor)
+			if (text_mode == 1)
+				DrawString(width_sum > 0 ? 135 + _widthSumOffset : 135, 375, "_");
+			else
+				DrawString(height_sum > 0 ? 145 + _heightSumOffset : 145, 375, "_");
+
+		// Draw numbers to simulated input field
+		if (width_sum > 0 && text_mode == 1)
+			DrawString(135, 375, to_string(width_sum));
+		if (height_sum > 0 && text_mode == 2)
+			DrawString(145, 375, to_string(height_sum));
+
+		if (input_number != 0) {
+			if (text_mode == 1)
+				width_sum = width_sum * 10 + input_number - 48;
+			else
+				height_sum = height_sum * 10 + input_number - 48;
+			input_number = 0;
+		}
+
+		if (GetKey(BACK).bPressed)
+			text_mode == 1 ? width_sum /= 10 : height_sum /= 10;
+
+		if (GetKey(ENTER).bPressed) {
+			text_mode++;
+		}
+
+		if (text_mode >= 3) {
+			BackupMapInfo();
+			if (width_sum != 0)
+				n_width = width_sum;
+			if (height_sum != 0)
+				n_height = height_sum;
+
+			width_sum = 0;
+			height_sum = 0;
+			RestoreMapInfo();
+			text_mode = 0;
+		}
+	}
+}
+
+void MapEditor::CheckKeyPressed() {
+	if (GetKey(RIGHT).bPressed) {
+		if (cameraOffsetX + camera_width < n_width) {
+			cameraOffsetX++;
+			UpdateCamera();
+		}
+	}
+
+	if (GetKey(LEFT).bPressed) {
+		if (cameraOffsetX > 0) {
+			cameraOffsetX--;
+			UpdateCamera();
+		}
+	}
+
+	if (GetKey(DOWN).bPressed) {
+		if (cameraOffsetY + camera_height < n_height) {
+			cameraOffsetY++;
+			UpdateCamera();
+		}
+	}
+
+	if (GetKey(UP).bPressed) {
+		if (cameraOffsetY > 0) {
+			cameraOffsetY--;
+			UpdateCamera();
+		}
+	}
+
+	if (GetKey(F2).bPressed) {
+		if (res != nullptr) {
+			vector<unsigned char> _spriteToVector;
+			auto _width = res->tMap->spr->width;
+			auto _height = res->tMap->spr->height;
+			for (auto y = 0; y < _height; y++) {
+				for (auto x = 0; x < _width; x++) {
+					_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).r);
+					_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).g);
+					_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).b);
+					_spriteToVector.push_back(res->tMap->spr->GetPixel(x, y).a);
+				}
+			}
+
+			auto _string = tilemap_name_no_extension.string() + ".png";
+			EncodeOneStep(_string, _spriteToVector, _width, _height);
+		}
+	}
+
+	// Save As
+	if (GetKey(F4).bPressed) {
+		OpenLevel("Save");
+		ofstream out(level_full_path, ios::out | ios::trunc | ios::binary);
+		if (out.is_open()) {
+			out << tilemap_full_path;
+			out << endl;
+			out << n_width << " " << n_height;
+			out << endl;
+			for (auto y = 0; y < n_height; y++) {
+				for (auto x = 0; x < n_width; x++) {
+					const auto index = y * n_width + x;
+					out << map_info[index].tileNumber << " ";
+					out << map_info[index].solid << " ";
+				}
+			}
+		}
+
+		out.close();
+	}
+
+	// Save Level
+	if (GetKey(F5).bPressed) {
+		if (level_full_path.empty())
+			OpenLevel("Save");
+
+		ofstream out(level_full_path, ios::out | ios::trunc | ios::binary);
+		if (out.is_open()) {
+			out << tilemap_full_path;
+			out << endl;
+			out << n_width << " " << n_height;
+			out << endl;
+			for (auto y = 0; y < n_height; y++) {
+				for (auto x = 0; x < n_width; x++) {
+					const auto index = y * n_width + x;
+					out << map_info[index].tileNumber << " ";
+					out << map_info[index].solid << " ";
+				}
+			}
+		}
+
+		out.close();
+	}
+
+	// Open Level
+	if (GetKey(F8).bPressed) {
+		OpenLevel("Level");
+		ifstream data(level_full_path, ios::in | ios::binary);
+		if (data.is_open()) {
+			data >> tilemap_full_path;
+			data >> n_width >> n_height;
+			if (tilemap_full_path == "-1") {
+				tilemap_full_path = "";
+			}
+
+			if (!tilemap_full_path.empty()) {
+				SetPaths("Tilemap", tilemap_full_path);
+				if (tilemap_extension == ".png")
+					res->tMap->SetSprite(new Sprite(tilemap_full_path));
+				if (tilemap_extension == ".spr")
+					res->tMap->SetSprite(SprConverter::convertSmartBlendedPixels(tilemap_full_path, 1));
+			}
+
+			delete[] map_info;
+			map_info = new TileInfo[n_width * n_height];
+
+			for (auto y = 0; y < n_height; y++) {
+				for (auto x = 0; x < n_width; x++) {
+					string boolval;
+					const auto index = y * n_width + x;
+					data >> map_info[index].tileNumber >> boolval;
+					if (boolval == "1")
+						map_info[index].solid = true;
+					else
+						map_info[index].solid = false;
+				}
+			}
+
+			data.close();
+			UpdateCamera();
+		}
+	}
+
+	// Open tilemap
+	if (GetKey(F9).bPressed) {
+		OpenLevel("Tilemap");
+		if (tilemap_extension == ".png") {
+			res->tMap->SetSprite(new Sprite(tilemap_full_path));
+		}
+
+		if (tilemap_extension == ".spr") {
+			res->tMap->SetSprite(SprConverter::convertSmartBlendedPixels(tilemap_full_path, 1));
+		}
+	}
+}
+
+void MapEditor::UpdateCamera() const {
+	for (auto y = 0; y < camera_height; y++) {
+		for (auto x = 0; x < camera_width; x++) {
+			const auto index = (y + cameraOffsetY) * n_width + x + cameraOffsetX;
+			const auto index2 = y * camera_width + x;
+			if (map_info[index].tileNumber != -1 && x < n_width && y < n_height) {
+				camera[index2].tileNumber = map_info[index].tileNumber;
+				camera[index2].solid = map_info[index].solid;
+			}
+			else {
+				camera[index2].tileNumber = -1;
+				camera[index2].solid = false;
+			}
+		}
+	}
+}
+
+
 void MapEditor::EncodeOneStep(const string& filename, vector<unsigned char>& image, const unsigned width, const unsigned height) const {
 	//Encode the image
 	const auto error = lodepng::encode(filename, image, width, height);
@@ -505,34 +554,15 @@ void MapEditor::EncodeOneStep(const string& filename, vector<unsigned char>& ima
 		cout << "encoder error " << error << ": " << lodepng_error_text(error) << endl;
 }
 
-void MapEditor::LoadConvert() const {
-	for (auto y = 0; y < canvas_height; y++) {
-		for (auto x = 0; x < canvas_width; x++) {
-			const auto index = y * n_width + x;
-			const auto index2 = y * canvas_width + x;
-			if (amount_drawn > 0) {
-				if (map_info[index].tileNumber != -1 && x < n_width && y < n_height) {
-					canvas[index2].tileNumber = map_info[index].tileNumber;
-					canvas[index2].solid = map_info[index].solid;
-				}
-				else {
-					canvas[index2].tileNumber = -1;
-					canvas[index2].solid = false;
-				}
-			}
-		}
-	}
-}
-
 void MapEditor::ResizeConvert() const {
 	for (auto y = 0; y < n_height; y++) {
 		for (auto x = 0; x < n_width; x++) {
 			const auto index = y * n_width + x;
-			const auto index2 = y * canvas_width + x;
+			const auto index2 = y * camera_width + x;
 
-			if (canvas[index2].tileNumber != -1 && x < canvas_width && y < canvas_height) {
-				map_info[index].tileNumber = canvas[index2].tileNumber;
-				map_info[index].solid = canvas[index2].solid;
+			if (camera[index2].tileNumber != -1 && x < camera_width && y < camera_height) {
+				map_info[index].tileNumber = camera[index2].tileNumber;
+				map_info[index].solid = camera[index2].solid;
 			}
 			else {
 				map_info[index].tileNumber = -1;
@@ -542,20 +572,45 @@ void MapEditor::ResizeConvert() const {
 	}
 }
 
-void MapEditor::ResizeMapInfo() {
+void MapEditor::BackupMapInfo() {
+	backup_height = n_height;
+	backup_width = n_width;
+	backup = new TileInfo[backup_height * backup_width];
+	for (auto i = 0; i < backup_height * backup_width; i++) 
+		backup[i] = map_info[i];
+}
+
+void MapEditor::RestoreMapInfo() {
 	delete[] map_info;
 	map_info = new TileInfo[n_width * n_height];
-	ResizeConvert();
+	for (auto y = 0; y < n_height; y++) {
+		for (auto x = 0; x < n_width; x++) {
+			const auto index = y * n_width + x;
+			const auto index2 = y * backup_width + x;
+			if (y < n_height && y < backup_height && x < n_width && x < backup_width) {
+				map_info[index] = backup[index2];
+			}
+			else {
+				map_info[index].tileNumber = -1;
+				map_info[index].solid = false;
+			}
+		}
+	}
+
+	delete[] backup;
+	backup_height = 0;
+	backup_width = 0;
+	UpdateCamera();
 }
 
 void MapEditor::PopulateTileInfo() {
-	delete[] canvas;
+	delete[] camera;
 	delete[] map_info;
-	canvas = new TileInfo[canvas_width * canvas_height];
-	map_info = new TileInfo[canvas_width * canvas_height];
-	for (auto i = 0; i < canvas_width * canvas_height; i++) {
-		canvas[i].tileNumber = -1;
-		canvas[i].solid = false;
+	camera = new TileInfo[camera_width * camera_height];
+	map_info = new TileInfo[n_width * n_height];
+	for (auto i = 0; i < n_width * n_height; i++) {
+		camera[i].tileNumber = -1;
+		camera[i].solid = false;
 
 		map_info[i].tileNumber = -1;
 		map_info[i].solid = false;
@@ -564,7 +619,7 @@ void MapEditor::PopulateTileInfo() {
 
 void MapEditor::OpenLevel(const string& type) {
 	OPENFILENAME ofn;
-	::memset(&ofn, 0, sizeof ofn);
+	memset(&ofn, 0, sizeof ofn);
 	char f1[MAX_PATH];
 	f1[0] = 0;
 	ofn.lStructSize = sizeof ofn;
