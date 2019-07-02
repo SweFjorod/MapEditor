@@ -6,6 +6,9 @@ MapEditor for One Lone Coders RPG game by SweFjorod.
 Thanks to One Lone Coder for the olcPixelGameEngine
 Thanks to Gorbit99 for the olcSprConverter.h
 Thanks to Lode Vandevenne for the lodepng so I could encode png files.
+
+You need to create a library name 'resources' under where you executable are
+then copy edit-button.png and font.pgex to that library.
 */
 
 #include "olcPixelGameEngine.h"
