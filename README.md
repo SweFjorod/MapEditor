@@ -6,7 +6,7 @@ Thanks to Gorbit99 for the olcSprConverter.h
 Thanks to Lode Vandevenne for the lodepng so I could encode png files.
 
 You need to have edit-button.png and font.pgex in a library from the executable then
-\\resources\files, for example if you are running VS and debugging remember to make a 
+\\resources\, for example if you are running VS and debugging remember to make a 
 library in your debug lib names resources and then copy those 2 files to it.
 
 This started out as a small project where I wanted to learn how to code C++ but has evolved
