@@ -126,7 +126,7 @@ public:
         sAppName = "Map Editor";
 
         res = new EditorResources(tilemap_full_path);
-		res_button = new EditorResources(exe_path + "edit-button.png");
+		res_button = new EditorResources(exe_path + "resources\\edit-button.png");
         bg_col = new Pixel( { 25, 25, 25, 255 } );
 
         offsetx = -1;
@@ -170,8 +170,6 @@ public:
 			}
 		}
 
-		DrawString(740, 395, "(" + to_string(actualMouseX) + "," + to_string(actualMouseY) + ")", WHITE, 1);
-		
     	if (actualMouseX / tile_size < camera_width && actualMouseY / tile_size < camera_height) {
 	        // Draw outline where mouse is
 	        DrawRect(mouseX * tile_size, mouseY * tile_size, tile_size - 1, tile_size - 1, YELLOW);
@@ -207,6 +205,7 @@ public:
 		// Draw Menu and help
 		if (text_mode == 0) {
 			DrawString(5, 375, "F2 = Save Tilemap F4 = Save As  F5 = Save  F8 = Load Level  F9 = Load Tilemap", WHITE, 1);
+			DrawString(5, 385, "Use arrow keys to move camera around level.", WHITE, 1);
 			DrawString(5, 395, "[LEFT CLICK] Draw   [RIGHT CLICK] Erase   [CTRL+LEFT CLICK] Select tile", WHITE, 1);
 			DrawString(5, 405, "[MIDDLE CLICK] Set collision   [SHIFT+MIDDLE CLICK] Unset collision", WHITE, 1);
 
@@ -491,7 +490,7 @@ void MapEditor::CheckKeyPressed() {
 				if (tilemap_extension == ".png")
 					res->tMap->SetSprite(new Sprite(tilemap_full_path));
 				if (tilemap_extension == ".spr")
-					res->tMap->SetSprite(SprConverter::convertSmartBlendedPixels(tilemap_full_path, 1));
+					res->tMap->SetSprite(SprConverter::ConvertSmartBlendedPixels(tilemap_full_path, 1));
 			}
 
 			delete[] map_info;
@@ -522,7 +521,7 @@ void MapEditor::CheckKeyPressed() {
 		}
 
 		if (tilemap_extension == ".spr") {
-			res->tMap->SetSprite(SprConverter::convertSmartBlendedPixels(tilemap_full_path, 1));
+			res->tMap->SetSprite(SprConverter::ConvertSmartBlendedPixels(tilemap_full_path, 1));
 		}
 	}
 }

@@ -6,16 +6,16 @@
 namespace olc {
 	class SprConverter {
 	public:
-		static olc::Sprite *convertBlownUp(const std::string& path, const size_t pixelSize) {
-			CGESprite spr(path);
+		static olc::Sprite *ConvertBlownUp(const std::string& path, const size_t pixelSize) {
+			const CGESprite spr(path);
 			if (spr.width == 0)
 				return nullptr;
-			loadFont();
+			LoadFont();
 			auto converted = new Sprite(spr.width * pixelSize, spr.height * pixelSize);
 			for (auto x = 0; x < spr.width; x++) {
 				for (auto y = 0; y < spr.height; y++) {
-					const auto fg = idToColour(spr.GetColour(x, y) & 0xf);
-					const auto bg = idToColour((spr.GetColour(x, y) & 0xf0) >> 4);
+					const auto fg = IdToColour(spr.GetColour(x, y) & 0xf);
+					const auto bg = IdToColour((spr.GetColour(x, y) & 0xf0) >> 4);
 					const auto glyph = characters[ids[spr.GetGlyph(x, y)]];
 					for (unsigned int dx = 0; dx < pixelSize; dx++) {
 						for (unsigned int dy = 0; dy < pixelSize; dy++) {
@@ -31,19 +31,19 @@ namespace olc {
 			return converted;
 		}
 
-		static olc::Sprite *convertFilledPixels(const std::string& path, size_t pixelSize, bool fg) {
-			CGESprite spr(path);
+		static olc::Sprite *ConvertFilledPixels(const std::string& path, size_t pixelSize, bool fg) {
+			const CGESprite spr(path);
 			if (spr.width == 0)
 				return nullptr;
-			Sprite *converted = new Sprite(spr.width * pixelSize, spr.height * pixelSize);
-			for (int x = 0; x < spr.width; x++) {
-				for (int y = 0; y < spr.height; y++) {
+			auto converted = new Sprite(spr.width * pixelSize, spr.height * pixelSize);
+			for (auto x = 0; x < spr.width; x++) {
+				for (auto y = 0; y < spr.height; y++) {
 					for (unsigned int dx = 0; dx < pixelSize; dx++) {
 						for (unsigned int dy = 0; dy < pixelSize; dy++) {
 							if (fg)
-								converted->SetPixel(x * pixelSize + dx, y * pixelSize + dy, idToColour(spr.GetColour(x, y) & 0xf));
+								converted->SetPixel(x * pixelSize + dx, y * pixelSize + dy, IdToColour(spr.GetColour(x, y) & 0xf));
 							else
-								converted->SetPixel(x * pixelSize + dx, y * pixelSize + dy, idToColour((spr.GetColour(x, y) & 0xf0) >> 4));
+								converted->SetPixel(x * pixelSize + dx, y * pixelSize + dy, IdToColour((spr.GetColour(x, y) & 0xf0) >> 4));
 						}
 					}
 				}
@@ -51,15 +51,15 @@ namespace olc {
 			return converted;
 		}
 
-		static olc::Sprite *convertDumbBlendedPixels(const std::string& path, const size_t pixelSize) {
-			CGESprite spr(path);
+		static olc::Sprite *ConvertDumbBlendedPixels(const std::string& path, const size_t pixelSize) {
+			const CGESprite spr(path);
 			if (spr.width == 0)
 				return nullptr;
 			auto converted = new Sprite(spr.width * pixelSize, spr.height * pixelSize);
 			for (auto x = 0; x < spr.width; x++) {
 				for (auto y = 0; y < spr.height; y++) {
-					auto fg = idToColour(spr.GetColour(x, y) & 0xf);
-					const auto bg = idToColour((spr.GetColour(x, y) & 0xf0) >> 4);
+					auto fg = IdToColour(spr.GetColour(x, y) & 0xf);
+					const auto bg = IdToColour((spr.GetColour(x, y) & 0xf0) >> 4);
 					fg.r = (fg.r + bg.r) / 2;
 					fg.g = (fg.g + bg.g) / 2;
 					fg.b = (fg.b + bg.b) / 2;
@@ -73,16 +73,16 @@ namespace olc {
 			return converted;
 		}
 
-		static olc::Sprite *convertSmartBlendedPixels(const std::string& path, size_t pixelSize) {
+		static olc::Sprite *ConvertSmartBlendedPixels(const std::string& path, size_t pixelSize) {
 			const CGESprite spr(path);
 			if (spr.width == 0)
 				return nullptr;
-			loadFont();
+			LoadFont();
 			auto converted = new Sprite(spr.width * pixelSize, spr.height * pixelSize);
 			for (auto x = 0; x < spr.width; x++) {
 				for (auto y = 0; y < spr.height; y++) {
-					const auto fg = idToColour(spr.GetColour(x, y) & 0xf);
-					const auto bg = idToColour((spr.GetColour(x, y) & 0xf0) >> 4);
+					const auto fg = IdToColour(spr.GetColour(x, y) & 0xf);
+					const auto bg = IdToColour((spr.GetColour(x, y) & 0xf0) >> 4);
 					const auto glyph = spr.GetGlyph(x, y);
 					float percent = 0;
 					for (auto i = 0; i < 64; i++) {
@@ -156,7 +156,7 @@ namespace olc {
 
 		static std::string ReturnexePath() {
 			char result[MAX_PATH];
-			return std::string(result, GetModuleFileName(NULL, result, MAX_PATH));
+			return std::string(result, GetModuleFileName(nullptr, result, MAX_PATH));
 		}
 
 		static std::string GetexePath() {
@@ -167,30 +167,30 @@ namespace olc {
 			return _newpath;
 		}
 
-		static Pixel idToColour(const char id) {
+		static Pixel IdToColour(const char id) {
 			const Pixel colours[] = { BLACK, DARK_BLUE, DARK_GREEN, DARK_CYAN, DARK_RED, DARK_MAGENTA, DARK_YELLOW, GREY,
 				DARK_GREY, BLUE, GREEN, CYAN, RED, MAGENTA, YELLOW, WHITE };
 			return colours[id];
 		}
 
-		static void loadFont() {
+		static void LoadFont() {
 			if (!characters.empty())
 				return;
 			characters.reserve(688);
 			ids.reserve(256 * 128);
 			std::ifstream file;
 			const auto _path = GetexePath();
-			file.open(_path + "font.pgex", std::ios::binary);
+			file.open(_path + "resources\\font.pgex", std::ios::binary);
 			if (!file.is_open())
 				throw std::exception("Couldn't open font file!");
 			for (int i = 0; i < 668; i++) {
 				uint64_t character = 0;
-				file.read((char *)&character, 8);
+				file.read(reinterpret_cast<char *>(&character), 8);
 				characters.push_back(character);
 			}
-			for (int i = 0; i < 256 * 128; i++) {
+			for (auto i = 0; i < 256 * 128; i++) {
 				uint16_t id = 0;
-				file.read((char *)&id, 2);
+				file.read(reinterpret_cast<char *>(&id), 2);
 				ids.push_back(id);
 			}
 			file.close();
