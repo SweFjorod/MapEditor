@@ -42,9 +42,6 @@ path tilemap_name_no_extension;
 int mouseX;
 int mouseY;
 
-// Camera variables
-bool cameraChanged;
-
 string ReturnExePath();
 
 typedef struct Tilemap {
@@ -104,6 +101,8 @@ class MapEditor : public PixelGameEngine{
 	int backup_width = 0;
 	int backup_height = 0;
 
+	int modnr = 10;
+
 	string exe_path = GetExePath();
 
 	TileInfo* map_info = {};
@@ -137,7 +136,6 @@ public:
 
 		n_width = 31;
 		n_height = 23;
-		cameraChanged = true;
 
 		PopulateTileInfo();
 
@@ -145,6 +143,10 @@ public:
     }
 
     bool OnUserUpdate(const float fElapsedTime) override {
+		if (res->tMap->spr->width != 0) {
+			modnr = res->tMap->spr->width / tile_size;
+		}
+
 		const auto actualMouseX = GetMouseX();
 		const auto actualMouseY = GetMouseY();
 		mouseX = actualMouseX / tile_size;
@@ -163,8 +165,8 @@ public:
 		for (auto y = 0; y < camera_height; y++) {
 			for (auto x = 0; x < camera_width; x++) {
 				const auto idx = camera[y * camera_width + x].tileNumber;
-				const auto sx = idx % 10;
-				const auto sy = idx / 10;
+				const auto sx = idx % modnr;
+				const auto sy = idx / modnr;
 				if (camera[y * camera_width + x].tileNumber != -1) {
 					DrawPartialSprite(x * tile_size, y * tile_size, res->tMap->spr, sx * tile_size, sy * tile_size, tile_size, tile_size);
 					if (camera[y * camera_width + x].solid)
@@ -275,8 +277,8 @@ void MapEditor::MouseClickingInCameraView() {
 		const auto index = mouseY * n_width + mouseX;
 		if (map_info[index].tileNumber != -1) {
 			const auto idx = map_info[index].tileNumber;
-			const auto sx = idx % 10;
-			const auto sy = idx / 10;
+			const auto sx = idx % modnr;
+			const auto sy = idx / modnr;
 			offsetx = sx * tile_size;
 			offsety = sy * tile_size;
 			x1 = offsetx + 504;
@@ -290,7 +292,7 @@ void MapEditor::MouseClickingInCameraView() {
 	else if (GetMouse(0).bHeld) {
 		if (offsetx != -1 && offsety != -1) {
 			const auto index = (mouseY + cameraOffsetY) * n_width + mouseX + cameraOffsetX;
-			const auto tileIndex = (offsety * res->tMap->spr->width / tile_size + offsetx) / tile_size;
+			const auto tileIndex = (offsety / tile_size) * (res->tMap->spr->width / tile_size) + (offsetx / tile_size);
 			map_info[index].tileNumber = tileIndex;
 			UpdateCamera();
 		}
